@@ -1,3 +1,8 @@
+mod lexer;
+
+use lexer::Scanner;
+use lexer::LexemeKind;
+
 use std::env;
 use std::fmt;
 use std::fs;
@@ -14,7 +19,7 @@ fn main() -> TWResult<()> {
         0 => run_prompt(),
         1 => run_file(&args[0]),
         _ => {
-            println!("Usage: tree-walk [script]");
+            eprintln!("Usage: tree-walk [script]");
             process::exit(64);
         }
     }
@@ -43,8 +48,11 @@ fn run_file<P: AsRef<path::Path> + fmt::Display>(filename: P) -> TWResult<()> {
 }
 
 fn run(source: String) -> TWResult<()> {
-    for token in source.split(" ") {
-        println!("{}", token);
+    for token in Scanner::new(source) {
+        if token.lexeme == LexemeKind::EOF {
+          break;
+        }
+        println!("{:?}", token);
     }
 
     Ok(())
