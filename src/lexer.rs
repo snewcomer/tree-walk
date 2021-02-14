@@ -28,13 +28,23 @@ pub enum LexemeKind {
 
 #[derive(Debug, PartialEq)]
 pub struct Token {
-    // line: usize,
+    line: usize,
     pub lexeme: LexemeKind,
+}
+
+impl Token {
+    pub fn new(lexeme: LexemeKind, line: usize) -> Self {
+        Self {
+            lexeme,
+            line
+        }
+    }
 }
 
 pub struct Scanner {
     cursor: usize,
     chars: Vec<char>,
+    line: usize,
 }
 
 // Lexer
@@ -43,12 +53,9 @@ impl Scanner {
         Self {
             // time and space higher with collect
             chars: source.chars().collect(),
-            cursor: 0
+            cursor: 0,
+            line: 0
         }
-    }
-
-    fn advance(&mut self) {
-        self.cursor += 1;
     }
 
     fn current_char(&self) -> Option<&char> {
@@ -74,7 +81,7 @@ impl Scanner {
             match c {
                 add if is_number(add) || add == '.' => {
                     buffer.push(add.to_owned());
-                    self.advance();
+                    self.cursor += 1;
                 }
                 _ => break,
             }
@@ -85,7 +92,7 @@ impl Scanner {
 
     fn word_boundary(&mut self) -> String {
         // first was ". next char is potentially the word
-        self.advance();
+        self.cursor += 1;
         let mut buffer = String::new();
         while self.peek_next().is_some() {
             let c = self.current_char();
@@ -93,7 +100,7 @@ impl Scanner {
                 Some(&'"') => break,
                 Some(&add) => {
                     buffer.push(add.to_owned());
-                    self.advance();
+                    self.cursor += 1;
                 }
                 None => break,
             }
@@ -109,7 +116,7 @@ impl Scanner {
             match c {
                 add if is_number(add) || is_valid_ident(add) => {
                     buffer.push(add.to_owned());
-                    self.advance();
+                    self.cursor += 1;
                 }
                 _ => break,
             }
@@ -142,78 +149,83 @@ impl Iterator for Scanner {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished() {
-            return tokenize(LexemeKind::EOF);
+            return Some(Token::new(LexemeKind::EOF, self.line));
         }
 
         let c = self.chars[self.cursor];
+        dbg!(c);
 
         if is_number(c) {
             let num = self.number_boundary();
-            return Some(Token { lexeme: LexemeKind::NUMBER(num) });
+            return Some(Token::new(LexemeKind::NUMBER(num), self.line));
         } else if is_valid_ident(c) {
             let lexeme = self.identifier_boundary();
-            return Some(Token { lexeme });
+            return Some(Token::new(lexeme, self.line));
         }
 
         let lexeme = match c {
-            '(' => tokenize(LexemeKind::LEFT_PAREN),
-            ')' => tokenize(LexemeKind::RIGHT_PAREN),
-            '{' => tokenize(LexemeKind::LEFT_BRACE),
-            '}' => tokenize(LexemeKind::RIGHT_BRACE),
-            ',' => tokenize(LexemeKind::COMMA),
-            '.' => tokenize(LexemeKind::DOT),
-            '-' => tokenize(LexemeKind::MINUS),
-            '+' => tokenize(LexemeKind::PLUS),
-            ';' => tokenize(LexemeKind::SEMICOLON),
-            '*' => tokenize(LexemeKind::STAR),
+            '(' => Some(Token::new(LexemeKind::LEFT_PAREN, self.line)),
+            ')' => Some(Token::new(LexemeKind::RIGHT_PAREN, self.line)),
+            '{' => Some(Token::new(LexemeKind::LEFT_BRACE, self.line)),
+            '}' => Some(Token::new(LexemeKind::RIGHT_BRACE, self.line)),
+            ',' => Some(Token::new(LexemeKind::COMMA, self.line)),
+            '.' => Some(Token::new(LexemeKind::DOT, self.line)),
+            '-' => Some(Token::new(LexemeKind::MINUS, self.line)),
+            '+' => Some(Token::new(LexemeKind::PLUS, self.line)),
+            ';' => Some(Token::new(LexemeKind::SEMICOLON, self.line)),
+            '*' => Some(Token::new(LexemeKind::STAR, self.line)),
             '!' => {
                 let next = self.peek_next();
-                tokenize(
+                Some(Token::new(
                     if next == Some(&'=') {
-                        self.advance();
+                        self.cursor += 1;
                         LexemeKind::BANG_EQUAL
                     } else {
                         LexemeKind::BANG
-                    }
-                )
+                    },
+                    self.line
+                ))
             }
             '=' => {
                 let next = self.peek_next();
-                tokenize(
+                Some(Token::new(
                     if next == Some(&'=') {
-                        self.advance();
+                        self.cursor += 1;
                         LexemeKind::EQUAL_EQUAL
                     } else {
                         LexemeKind::EQUAL
-                    }
-                )
+                    },
+                    self.line
+                ))
             }
             '<' => {
                 let next = self.peek_next();
-                tokenize(
+                Some(Token::new(
                     if next == Some(&'=') {
-                        self.advance();
+                        self.cursor += 1;
                         LexemeKind::LESS_EQUAL
                     } else {
                         LexemeKind::LESS
-                    }
-                 )
+                    },
+                    self.line
+                 ))
             }
             '>' => {
                 let next = self.peek_next();
-                tokenize(
+                Some(Token::new(
                     if next == Some(&'=') {
-                        self.advance();
+                        self.cursor += 1;
                         LexemeKind::GREATER_EQUAL
                     } else {
                         LexemeKind::GREATER
-                    }
-                )
+                    },
+                    self.line
+                ))
             }
             '/' => {
                 let next = self.peek_next();
                 if next == Some(&'/') {
-                    self.advance();
+                    self.cursor += 1;
                     let mut done = false;
                     while !done {
                         if self.is_finished() {
@@ -224,7 +236,7 @@ impl Iterator for Scanner {
                                 if self.is_finished() {
                                     done = true;
                                 } else {
-                                    self.advance();
+                                    self.cursor += 1;
                                 }
                             } else {
                                 done = true;
@@ -234,21 +246,24 @@ impl Iterator for Scanner {
 
                     self.next()
                 } else {
-                    tokenize(LexemeKind::SLASH)
+                    Some(Token::new(LexemeKind::SLASH, self.line))
                 }
             }
             c if c.is_whitespace() => {
-                self.advance();
+                if c == '\n' {
+                    self.line += 1;
+                }
+                self.cursor += 1;
                 self.next()
             }
             '"' => {
                 let word = self.word_boundary();
-                Some(Token { lexeme: LexemeKind::STRING(word) })
+                Some(Token::new(LexemeKind::STRING(word), self.line))
             }
-            _ => tokenize(LexemeKind::EOF)
+            _ => Some(Token::new(LexemeKind::EOF, self.line))
         };
 
-        self.advance();
+        self.cursor += 1;
         lexeme
     }
 }
@@ -262,9 +277,6 @@ fn is_valid_ident(c: char) -> bool {
     re.is_match(&c.to_string())
 }
 
-fn tokenize(lexeme: LexemeKind) -> Option<Token> {
-    Some(Token { lexeme })
-}
 
 #[cfg(test)]
 mod tests {
@@ -273,73 +285,92 @@ mod tests {
     #[test]
     fn it_works() {
         let mut sc = Scanner::new("(!=) ==".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::LEFT_PAREN });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::BANG_EQUAL });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::RIGHT_PAREN });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EQUAL_EQUAL });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LEFT_PAREN, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::BANG_EQUAL, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RIGHT_PAREN, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EQUAL_EQUAL, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_comments() {
         let mut sc = Scanner::new("{} // foo".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::LEFT_BRACE });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::RIGHT_BRACE });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LEFT_BRACE, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RIGHT_BRACE, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_comments_end() {
         let mut sc = Scanner::new("{} //".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::LEFT_BRACE });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::RIGHT_BRACE });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LEFT_BRACE, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RIGHT_BRACE, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_strings() {
         let mut sc = Scanner::new("\"bar\" ".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::STRING("bar".to_string()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("bar".to_string()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_combo_strings() {
         let mut sc = Scanner::new("\"foo\" = \"bar\" ".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::STRING("foo".to_string()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EQUAL });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::STRING("bar".to_string()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("foo".to_string()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EQUAL, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("bar".to_string()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_numbers() {
         let mut sc = Scanner::new("1.2".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::NUMBER("1.2".parse().unwrap()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER("1.2".parse().unwrap()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_addition() {
-        let mut sc = Scanner::new("1+2".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::NUMBER("1.0".parse().unwrap()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::PLUS });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::NUMBER("2.0".parse().unwrap()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        let mut sc = Scanner::new("1+2.0".to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER("1.0".parse().unwrap()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::PLUS, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER("2.0".parse().unwrap()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_reserved_words() {
         let mut sc = Scanner::new("and".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::AND });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::AND, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+
+        let mut sc = Scanner::new("while".to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::WHILE, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 
     #[test]
     fn it_handles_idents_partial_reserved() {
         let mut sc = Scanner::new("andd".to_owned());
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::IDENTIFIER("andd".to_string()) });
-        assert_eq!(sc.next().unwrap(), Token { lexeme: LexemeKind::EOF });
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("andd".to_string()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+    }
+
+    #[test]
+    fn it_handles_newlines() {
+        let source = "
+and while
+
+andd
+";
+        let mut sc = Scanner::new(source.to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::AND, 1));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::WHILE, 1));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("andd".to_string()), 3));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 3));
     }
 }
