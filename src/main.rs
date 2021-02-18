@@ -50,7 +50,7 @@ fn run_file<P: AsRef<path::Path> + fmt::Display>(filename: P) -> TWResult<()> {
 fn run(source: String) -> TWResult<()> {
     for token in Scanner::new(source) {
         if token.lexeme == LexemeKind::EOF {
-          break;
+            break;
         }
         println!("{:?}", token);
     }

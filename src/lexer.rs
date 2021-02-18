@@ -1,6 +1,5 @@
 extern crate regex;
 use regex::Regex;
-use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum LexemeKind {
@@ -22,6 +21,8 @@ pub enum LexemeKind {
     // Keywords.
     AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR,
     PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
+
+    UNEXPECTED,
 
     EOF
 }
@@ -47,14 +48,14 @@ pub struct Scanner {
     line: usize,
 }
 
-// Lexer
+// Lexer - group raw substrings into lexemes.  This is a higher representation than the raw source.
 impl Scanner {
     pub fn new(source: String) -> Self {
         Self {
             // time and space higher with collect
             chars: source.chars().collect(),
             cursor: 0,
-            line: 0
+            line: 0,
         }
     }
 
@@ -153,7 +154,6 @@ impl Iterator for Scanner {
         }
 
         let c = self.chars[self.cursor];
-        dbg!(c);
 
         if is_number(c) {
             let num = self.number_boundary();
@@ -244,6 +244,8 @@ impl Iterator for Scanner {
                         }
                     }
 
+                    // We aren't capturing tokens because the point of this is to execute the
+                    // program and not faithfully represent every character (lossless)
                     self.next()
                 } else {
                     Some(Token::new(LexemeKind::SLASH, self.line))
@@ -260,7 +262,14 @@ impl Iterator for Scanner {
                 let word = self.word_boundary();
                 Some(Token::new(LexemeKind::STRING(word), self.line))
             }
-            _ => Some(Token::new(LexemeKind::EOF, self.line))
+            _ => {
+                if self.is_finished() {
+                    Some(Token::new(LexemeKind::EOF, self.line))
+                } else {
+                    // TODO: how to handle errors.  Should this only happen in the parse phase?
+                    Some(Token::new(LexemeKind::UNEXPECTED, self.line))
+                }
+            }
         };
 
         self.cursor += 1;
@@ -372,5 +381,14 @@ andd
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::WHILE, 1));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("andd".to_string()), 3));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 3));
+    }
+
+    #[test]
+    fn it_handles_unexpected_character() {
+        let source = "/·";
+        let mut sc = Scanner::new(source.to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::SLASH, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::UNEXPECTED, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
     }
 }
