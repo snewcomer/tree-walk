@@ -1,7 +1,8 @@
 mod lexer;
+mod parser;
 
 use lexer::Scanner;
-use lexer::LexemeKind;
+use parser::Parser;
 
 use std::env;
 use std::fmt;
@@ -48,12 +49,10 @@ fn run_file<P: AsRef<path::Path> + fmt::Display>(filename: P) -> TWResult<()> {
 }
 
 fn run(source: String) -> TWResult<()> {
-    for token in Scanner::new(source) {
-        if token.lexeme == LexemeKind::EOF {
-            break;
-        }
-        println!("{:?}", token);
-    }
+    let tokens = Scanner::new(source).collect();
+
+    let mut parser = Parser::new(tokens);
+    parser.parse();
 
     Ok(())
 }
