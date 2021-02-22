@@ -63,10 +63,6 @@ impl Scanner {
         self.chars.get(self.cursor)
     }
 
-    fn current_char_unsafe(&self) -> char {
-        self.chars[self.cursor]
-    }
-
     fn peek_next(&self) -> Option<&char> {
         self.chars.get(self.cursor+1)
     }
@@ -78,8 +74,8 @@ impl Scanner {
     fn number_boundary(&mut self) -> f64 {
         let mut buffer = String::new();
         while self.current_char().is_some() {
-            let c = self.current_char_unsafe();
-            match c {
+            let c = self.current_char().unwrap();
+            match *c {
                 add if is_number(add) || add == '.' => {
                     buffer.push(add.to_owned());
                     self.cursor += 1;
@@ -96,14 +92,14 @@ impl Scanner {
         self.cursor += 1;
         let mut buffer = String::new();
         while self.peek_next().is_some() {
-            let c = self.current_char();
-            match c {
-                Some(&'"') => break,
-                Some(&add) => {
+            let c = self.current_char().unwrap();
+            match *c {
+                '"' => break,
+                add => {
                     buffer.push(add.to_owned());
                     self.cursor += 1;
                 }
-                None => break,
+                _ => break,
             }
         }
 
@@ -113,8 +109,8 @@ impl Scanner {
     fn identifier_boundary(&mut self) -> LexemeKind {
         let mut buffer = String::new();
         while self.current_char().is_some() {
-            let c = self.current_char_unsafe();
-            match c {
+            let c = self.current_char().unwrap();
+            match *c {
                 add if is_number(add) || is_valid_ident(add) => {
                     buffer.push(add.to_owned());
                     self.cursor += 1;
