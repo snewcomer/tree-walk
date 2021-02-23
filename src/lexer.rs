@@ -147,7 +147,7 @@ impl Iterator for Scanner {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished() {
-            return Some(Token::new(LexemeKind::EOF, self.line));
+            return None;
         }
 
         let c = self.chars[self.cursor];
@@ -295,7 +295,13 @@ mod tests {
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::BANG_EQUAL, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RIGHT_PAREN, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EQUAL_EQUAL, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
+    }
+
+    #[test]
+    fn it_works_collect() {
+        let tokens: Vec<Token> = Scanner::new("(!=) ==".to_owned()).collect();
+        assert_eq!(tokens.len(), 4);
     }
 
     #[test]
@@ -303,8 +309,7 @@ mod tests {
         let mut sc = Scanner::new("{} // foo".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LEFT_BRACE, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RIGHT_BRACE, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
@@ -312,15 +317,14 @@ mod tests {
         let mut sc = Scanner::new("{} //".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LEFT_BRACE, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RIGHT_BRACE, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
     fn it_handles_strings() {
         let mut sc = Scanner::new("\"bar\" ".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("bar".to_string()), 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
@@ -329,14 +333,14 @@ mod tests {
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("foo".to_string()), 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EQUAL, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("bar".to_string()), 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
     fn it_handles_numbers() {
         let mut sc = Scanner::new("1.2".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER("1.2".parse().unwrap()), 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
@@ -345,25 +349,25 @@ mod tests {
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER("1.0".parse().unwrap()), 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::PLUS, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER("2.0".parse().unwrap()), 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
     fn it_handles_reserved_words() {
         let mut sc = Scanner::new("and".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::AND, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
 
         let mut sc = Scanner::new("while".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::WHILE, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
     fn it_handles_idents_partial_reserved() {
         let mut sc = Scanner::new("andd".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("andd".to_string()), 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
@@ -377,7 +381,7 @@ andd
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::AND, 1));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::WHILE, 1));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("andd".to_string()), 3));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 3));
+        assert_eq!(sc.next(), None);
     }
 
     #[test]
@@ -386,6 +390,6 @@ andd
         let mut sc = Scanner::new(source.to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::SLASH, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::UNEXPECTED, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EOF, 0));
+        assert_eq!(sc.next(), None);
     }
 }
