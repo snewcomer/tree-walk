@@ -1,6 +1,6 @@
-use crate::lexer::{Token, LexemeKind};
+use crate::lexer::{Scanner, Token, LexemeKind};
 
-enum Expr {
+pub enum Expr {
     Binary(ExprBinary),
     Literal(ExprLiteral),
     Unary(ExprUnary),
@@ -20,7 +20,7 @@ struct ExprUnary {
 enum ExprLiteral {
     BOOLEAN(bool),
     STRING(String),
-    NUMBER(i32),
+    NUMBER(f64),
 }
 
 pub struct Parser {
@@ -74,21 +74,13 @@ impl Parser {
         todo!();
     }
 
-    fn advance(&mut self) -> Option<&Token> {
-        let token = self.tokens.get(self.cursor);
-
-        self.cursor += 1;
-
-        token
-    }
-
-    fn at(&self, kind: LexemeKind) -> bool {
+    fn at(&self, kind: &LexemeKind) -> bool {
         if self.at_end() { return false };
-        self.peek_kind() == Some(&kind)
+        self.peek_kind() == Some(kind)
     }
 
     fn is_equal(&self, kinds: Vec<LexemeKind>) -> bool {
-        let res = kinds.iter().find(|&&k| self.at(k));
+        let res = kinds.iter().find(|&k| self.at(k));
         res.is_some()
     }
 
@@ -137,40 +129,52 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Expr {
-        let res = None;
+        let mut res = None;
         while self.is_equal(vec![LexemeKind::BANG, LexemeKind::MINUS]) {
-            let operator = self.peek_previous_kind().unwrap();
+            let operator = match self.peek_previous_kind() {
+                Some(&LexemeKind::BANG) => LexemeKind::BANG,
+                Some(&LexemeKind::MINUS) => LexemeKind::MINUS,
+                _ => todo!()
+            };
             let right = self.unary();
-            res = Some(Expr::Unary(ExprUnary { operator: *operator, right: Box::new(right) }))
+            res = Some(Expr::Unary(ExprUnary { operator, right: Box::new(right) }))
         }
 
         if res.is_some() { res.unwrap() } else { self.primary() }
     }
 
     fn primary(&mut self) -> Expr {
-        if self.at(LexemeKind::FALSE) {
-            let val = self.advance();
-            Expr::Literal(ExprLiteral::BOOLEAN(false))
-        } else if self.at(LexemeKind::TRUE) {
-            let val = self.advance();
-            Expr::Literal(ExprLiteral::BOOLEAN(true))
-        } else if self.at(LexemeKind::STRING(String)) {
-            let val = self.advance();
-            val.map(|Token { &LexemeKind(*st), .. }| Expr::Literal(ExprLiteral::STRING(st)))
-        } else if self.at(LexemeKind::NUMBER(_)) {
-            let val = self.advance();
-            val.map(|Token { &LexemeKind(*num), .. }| Expr::Literal(ExprLiteral::NUMBER(num))
+        // TODO: Cell::new
+        let token = self.tokens.get(self.cursor).unwrap();
+        match &token.lexeme {
+            LexemeKind::FALSE => {
+                self.cursor += 1;
+                Expr::Literal(ExprLiteral::BOOLEAN(false))
+            }
+            LexemeKind::TRUE => {
+                self.cursor += 1;
+                Expr::Literal(ExprLiteral::BOOLEAN(true))
+            }
+            LexemeKind::STRING(st) => {
+                self.cursor += 1;
+                Expr::Literal(ExprLiteral::STRING(st.to_string()))
+            }
+            LexemeKind::NUMBER(num) => {
+                // self.cursor += 1;
+                Expr::Literal(ExprLiteral::NUMBER(*num))
+            }
+            _ => todo!()
         }
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+// #[cfg(test)]
+// mod test {
+//     use super::*;
 
-    #[test]
-    fn it_works() {
-        let tokens = Scanner::new("(!=) ==".to_owned()).collect();
-        let ast = Parser::new(tokens).parse();
-    }
-}
+//     #[test]
+//     fn it_works() {
+//         let tokens = Scanner::new("(!=) ==".to_owned()).collect();
+//         let ast = Parser::new(tokens).parse();
+//     }
+// }

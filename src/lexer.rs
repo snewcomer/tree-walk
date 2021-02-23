@@ -93,6 +93,7 @@ impl Scanner {
         let mut buffer = String::new();
         while self.peek_next().is_some() {
             let c = self.current_char().unwrap();
+            // TOOD: match c with none case as well
             match *c {
                 '"' => break,
                 add => {
