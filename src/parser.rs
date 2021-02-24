@@ -5,6 +5,7 @@ pub enum Expr {
     Binary(ExprBinary),
     Literal(ExprLiteral),
     Unary(ExprUnary),
+    Grouping(ExprGrouping),
 }
 
 #[derive(Debug, PartialEq)]
@@ -25,6 +26,11 @@ pub enum ExprLiteral {
     BOOLEAN(bool),
     STRING(String),
     NUMBER(f64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ExprGrouping {
+    value: Box<Expr>,
 }
 
 pub struct Parser {
@@ -74,9 +80,21 @@ impl Parser {
     //     self.peek_previous().map(|Token { lexeme, .. }| lexeme)
     // }
 
+    fn expect(&mut self, kind: &LexemeKind) {
+        if self.at(kind) {
+            self.cursor += 1;
+        } else {
+            todo!();
+        }
+    }
+
     fn at(&self, kind: &LexemeKind) -> bool {
         if self.at_end() { return false };
         self.peek_kind() == Some(kind)
+    }
+
+    fn error(&self) {
+        todo!();
     }
 
     fn is_equal(&self, kinds: Vec<LexemeKind>) -> bool {
@@ -194,6 +212,12 @@ impl Parser {
                 self.cursor += 1;
                 Expr::Literal(ExprLiteral::NUMBER(*num))
             }
+            LexemeKind::LEFT_PAREN => {
+                self.cursor += 1;
+                let expr = self.expression();
+                self.expect(&LexemeKind::RIGHT_PAREN);
+                Expr::Grouping(ExprGrouping { value: Box::new(expr) })
+            }
             _ => todo!()
         }
     }
@@ -211,6 +235,19 @@ mod test {
             left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
             operator: LexemeKind::PLUS,
             right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+        }));
+    }
+
+    #[test]
+    fn it_works_parenthesized_expression() {
+        let tokens = Scanner::new("(1+1)".to_owned()).collect();
+        let ast = Parser::new(tokens).parse();
+        assert_eq!(ast, Expr::Grouping(ExprGrouping {
+            value: Box::new(Expr::Binary(ExprBinary {
+                left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                operator: LexemeKind::PLUS,
+                right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+            })),
         }));
     }
 }
