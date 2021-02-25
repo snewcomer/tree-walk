@@ -36,7 +36,6 @@ pub struct ExprGrouping {
 pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
-    binary: Option<ExprBinary>
 }
 
 impl Parser {
@@ -44,7 +43,6 @@ impl Parser {
         Self {
             tokens,
             cursor: 0,
-            binary: None
         }
     }
 
@@ -52,35 +50,19 @@ impl Parser {
         self.expression()
     }
 
-    // fn push_event(&mut self, left: ExprBinary, operator: Token, right: ExprBinary) {
-    //     self.binary = Some(ExprBinary {
-    //         left: Box::new(left),
-    //         operator,
-    //         right: Box::new(right)
-    //     })
-    // }
-
     fn at_end(&self) -> bool {
-        self.peek_kind() == Some(&LexemeKind::EOF)
+        self.peek_kind() == Some(LexemeKind::EOF)
     }
 
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.cursor)
     }
 
-    // fn peek_previous(&self) -> Option<&Token> {
-    //     self.tokens.get(self.cursor - 1)
-    // }
-
-    fn peek_kind(&self) -> Option<&LexemeKind> {
-        self.peek().map(|Token { lexeme, .. }| lexeme)
+    fn peek_kind(&self) -> Option<LexemeKind> {
+        self.peek().and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
     }
 
-    // fn peek_previous_kind(&self) -> Option<&LexemeKind> {
-    //     self.peek_previous().map(|Token { lexeme, .. }| lexeme)
-    // }
-
-    fn expect(&mut self, kind: &LexemeKind) {
+    fn expect(&mut self, kind: LexemeKind) {
         if self.at(kind) {
             self.cursor += 1;
         } else {
@@ -88,7 +70,7 @@ impl Parser {
         }
     }
 
-    fn at(&self, kind: &LexemeKind) -> bool {
+    fn at(&self, kind: LexemeKind) -> bool {
         if self.at_end() { return false };
         self.peek_kind() == Some(kind)
     }
@@ -98,7 +80,7 @@ impl Parser {
     }
 
     fn is_equal(&self, kinds: Vec<LexemeKind>) -> bool {
-        let res = kinds.iter().find(|&k| self.at(k));
+        let res = kinds.iter().find(|&k| self.at(k.clone()));
         res.is_some()
     }
 
@@ -110,11 +92,7 @@ impl Parser {
         let mut expr = self.comparison();
 
         while self.is_equal(vec![LexemeKind::BANG_EQUAL, LexemeKind::EQUAL_EQUAL]) {
-            let operator = match self.peek_kind() {
-                Some(&LexemeKind::BANG_EQUAL) => LexemeKind::BANG_EQUAL,
-                Some(&LexemeKind::EQUAL_EQUAL) => LexemeKind::EQUAL_EQUAL,
-                _ => todo!()
-            };
+            let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.comparison();
             expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
@@ -127,13 +105,7 @@ impl Parser {
         let mut expr = self.term();
 
         while self.is_equal(vec![LexemeKind::GREATER, LexemeKind::GREATER_EQUAL, LexemeKind::LESS, LexemeKind::LESS_EQUAL]) {
-            let operator = match self.peek_kind() {
-                Some(&LexemeKind::GREATER) => LexemeKind::GREATER,
-                Some(&LexemeKind::GREATER_EQUAL) => LexemeKind::GREATER_EQUAL,
-                Some(&LexemeKind::LESS) => LexemeKind::LESS,
-                Some(&LexemeKind::LESS_EQUAL) => LexemeKind::LESS_EQUAL,
-                _ => todo!()
-            };
+            let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.term();
             expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
@@ -146,11 +118,7 @@ impl Parser {
         let mut expr = self.factor();
 
         while self.is_equal(vec![LexemeKind::MINUS, LexemeKind::PLUS]) {
-            let operator = match self.peek_kind() {
-                Some(&LexemeKind::MINUS) => LexemeKind::MINUS,
-                Some(&LexemeKind::PLUS) => LexemeKind::PLUS,
-                _ => todo!()
-            };
+            let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.factor();
             expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
@@ -163,11 +131,7 @@ impl Parser {
         let mut expr = self.unary();
 
         while self.is_equal(vec![LexemeKind::SLASH, LexemeKind::STAR]) {
-            let operator = match self.peek_kind() {
-                Some(&LexemeKind::SLASH) => LexemeKind::SLASH,
-                Some(&LexemeKind::STAR) => LexemeKind::STAR,
-                _ => todo!()
-            };
+            let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
             expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
@@ -179,11 +143,7 @@ impl Parser {
     fn unary(&mut self) -> Expr {
         let mut res = None;
         while self.is_equal(vec![LexemeKind::BANG, LexemeKind::MINUS]) {
-            let operator = match self.peek_kind() {
-                Some(&LexemeKind::BANG) => LexemeKind::BANG,
-                Some(&LexemeKind::MINUS) => LexemeKind::MINUS,
-                _ => todo!()
-            };
+            let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
             res = Some(Expr::Unary(ExprUnary { operator, right: Box::new(right) }))
@@ -193,7 +153,6 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Expr {
-        // TODO: Cell::new
         let token = self.tokens.get(self.cursor).unwrap();
         match &token.lexeme {
             LexemeKind::FALSE => {
@@ -215,7 +174,7 @@ impl Parser {
             LexemeKind::LEFT_PAREN => {
                 self.cursor += 1;
                 let expr = self.expression();
-                self.expect(&LexemeKind::RIGHT_PAREN);
+                self.expect(LexemeKind::RIGHT_PAREN);
                 Expr::Grouping(ExprGrouping { value: Box::new(expr) })
             }
             _ => todo!()

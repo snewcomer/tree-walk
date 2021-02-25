@@ -1,7 +1,7 @@
 extern crate regex;
 use regex::Regex;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LexemeKind {
     // Single-character tokens.
     LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
@@ -93,14 +93,12 @@ impl Scanner {
         let mut buffer = String::new();
         while self.peek_next().is_some() {
             let c = self.current_char().unwrap();
-            // TOOD: match c with none case as well
             match *c {
                 '"' => break,
                 add => {
                     buffer.push(add.to_owned());
                     self.cursor += 1;
                 }
-                _ => break,
             }
         }
 
