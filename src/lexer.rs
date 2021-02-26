@@ -1,5 +1,6 @@
 extern crate regex;
 use regex::Regex;
+use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LexemeKind {
@@ -52,6 +53,12 @@ pub enum LexemeKind {
     UNEXPECTED,
 
     EOF,
+}
+
+impl fmt::Display for LexemeKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug, PartialEq)]

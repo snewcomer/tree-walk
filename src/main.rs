@@ -52,7 +52,9 @@ fn run(source: String) -> TWResult<()> {
     let tokens = Scanner::new(source).collect();
 
     let mut parser = Parser::new(tokens);
-    parser.parse();
+    let ast = parser.parse().unwrap();
+
+    println!("{:?}", parser::debug_tree(ast));
 
     Ok(())
 }

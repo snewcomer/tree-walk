@@ -9,6 +9,18 @@ pub enum Expr {
     Error,
 }
 
+impl Expr {
+    fn debug(&self) -> String {
+        match &self {
+            Expr::Binary(variant) => variant.debug(),
+            Expr::Literal(variant) => variant.debug(),
+            Expr::Unary(variant) => variant.debug(),
+            Expr::Grouping(variant) => variant.debug(),
+            Expr::Error => "~ERROR~".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ExprBinary {
     left: Box<Expr>,
@@ -16,10 +28,55 @@ pub struct ExprBinary {
     right: Box<Expr>,
 }
 
+impl ExprBinary {
+    fn debug(&self) -> String {
+        let mut st = String::new();
+        st.push_str("(");
+
+        let Self {
+            left,
+            operator,
+            right,
+        } = self;
+
+        let op = operator.to_string();
+        st.push_str(&op);
+        st.push_str(" ");
+
+        let l = &(*left).debug();
+        st.push_str(l);
+        st.push_str(" ");
+
+        let r = &(*right).debug();
+        st.push_str(r);
+
+        st
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ExprUnary {
     operator: LexemeKind,
     right: Box<Expr>,
+}
+
+impl ExprUnary {
+    fn debug(&self) -> String {
+        let mut st = String::new();
+        st.push_str("( ");
+
+        let Self { operator, right } = self;
+
+        let op = operator.to_string();
+        st.push_str(&op);
+        st.push_str(" ");
+
+        let r = &(*right).debug();
+        st.push_str(r);
+        st.push_str(" ");
+
+        st
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -29,9 +86,28 @@ pub enum ExprLiteral {
     NUMBER(f64),
 }
 
+impl ExprLiteral {
+    fn debug(&self) -> String {
+        match self {
+            ExprLiteral::BOOLEAN(true) => "true".to_string(),
+            ExprLiteral::BOOLEAN(false) => "true".to_string(),
+            ExprLiteral::STRING(st) => st.to_string(),
+            ExprLiteral::NUMBER(n) => n.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ExprGrouping {
     value: Box<Expr>,
+}
+
+impl ExprGrouping {
+    fn debug(&self) -> String {
+        let Self { value } = self;
+
+        value.debug()
+    }
 }
 
 pub struct Parser {
@@ -39,11 +115,40 @@ pub struct Parser {
     cursor: usize,
 }
 
+pub fn debug_tree(ast: Expr) -> String {
+    let mut st = String::new();
+    st.push_str("(");
+    if let Expr::Binary(ExprBinary {
+        left,
+        operator,
+        right,
+    }) = ast
+    {
+        let op = operator.to_string();
+        st.push_str(&op);
+        st.push_str(" ");
+
+        let l = &(*left).debug();
+        st.push_str(l);
+        st.push_str(" ");
+
+        let r = &(*right).debug();
+        st.push_str(r);
+    } else {
+        println!("Not an expression");
+    }
+
+    st.push_str(")");
+    st
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, cursor: 0 }
     }
 
+    // TODO: Do we need to return Options up the chain?  Did this to take advantage of ! error
+    // handling but not exactly sure of my strategy
     pub fn parse(&mut self) -> Option<Expr> {
         self.expression()
     }
