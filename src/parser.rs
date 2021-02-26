@@ -1,4 +1,4 @@
-use crate::lexer::{Scanner, Token, LexemeKind};
+use crate::lexer::{LexemeKind, Scanner, Token};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -6,19 +6,20 @@ pub enum Expr {
     Literal(ExprLiteral),
     Unary(ExprUnary),
     Grouping(ExprGrouping),
+    Error,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct ExprBinary {
     left: Box<Expr>,
     operator: LexemeKind,
-    right: Box<Expr>
+    right: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct ExprUnary {
     operator: LexemeKind,
-    right: Box<Expr>
+    right: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -40,13 +41,10 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self {
-            tokens,
-            cursor: 0,
-        }
+        Self { tokens, cursor: 0 }
     }
 
-    pub fn parse(&mut self) -> Expr {
+    pub fn parse(&mut self) -> Option<Expr> {
         self.expression()
     }
 
@@ -59,7 +57,8 @@ impl Parser {
     }
 
     fn peek_kind(&self) -> Option<LexemeKind> {
-        self.peek().and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
+        self.peek()
+            .and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
     }
 
     fn expect(&mut self, kind: LexemeKind) {
@@ -71,12 +70,14 @@ impl Parser {
     }
 
     fn at(&self, kind: LexemeKind) -> bool {
-        if self.at_end() { return false };
+        if self.at_end() {
+            return false;
+        };
         self.peek_kind() == Some(kind)
     }
 
-    fn error(&self) {
-        todo!();
+    fn error(&self) -> Option<Expr> {
+        Some(Expr::Error)
     }
 
     fn is_equal(&self, kinds: Vec<LexemeKind>) -> bool {
@@ -84,100 +85,132 @@ impl Parser {
         res.is_some()
     }
 
-    fn expression(&mut self) -> Expr {
-       self.equality()
+    fn expression(&mut self) -> Option<Expr> {
+        self.equality()
     }
 
-    fn equality(&mut self) -> Expr {
+    fn equality(&mut self) -> Option<Expr> {
         let mut expr = self.comparison();
 
         while self.is_equal(vec![LexemeKind::BANG_EQUAL, LexemeKind::EQUAL_EQUAL]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.comparison();
-            expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
+            expr = Some(Expr::Binary(ExprBinary {
+                left: Box::new(expr.unwrap()),
+                operator,
+                right: Box::new(right.unwrap()),
+            }))
         }
 
         expr
     }
 
-    fn comparison(&mut self) -> Expr {
+    fn comparison(&mut self) -> Option<Expr> {
         let mut expr = self.term();
 
-        while self.is_equal(vec![LexemeKind::GREATER, LexemeKind::GREATER_EQUAL, LexemeKind::LESS, LexemeKind::LESS_EQUAL]) {
+        while self.is_equal(vec![
+            LexemeKind::GREATER,
+            LexemeKind::GREATER_EQUAL,
+            LexemeKind::LESS,
+            LexemeKind::LESS_EQUAL,
+        ]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.term();
-            expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
+            expr = Some(Expr::Binary(ExprBinary {
+                left: Box::new(expr.unwrap()),
+                operator,
+                right: Box::new(right.unwrap()),
+            }))
         }
 
         expr
     }
 
-    fn term(&mut self) -> Expr {
+    fn term(&mut self) -> Option<Expr> {
         let mut expr = self.factor();
 
         while self.is_equal(vec![LexemeKind::MINUS, LexemeKind::PLUS]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.factor();
-            expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
+            expr = Some(Expr::Binary(ExprBinary {
+                left: Box::new(expr.unwrap()),
+                operator,
+                right: Box::new(right.unwrap()),
+            }))
         }
 
         expr
     }
 
-    fn factor(&mut self) -> Expr {
+    fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
 
         while self.is_equal(vec![LexemeKind::SLASH, LexemeKind::STAR]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
-            expr = Expr::Binary(ExprBinary{ left: Box::new(expr), operator, right: Box::new(right) })
+            expr = Some(Expr::Binary(ExprBinary {
+                left: Box::new(expr.unwrap()),
+                operator,
+                right: Box::new(right.unwrap()),
+            }))
         }
 
         expr
     }
 
-    fn unary(&mut self) -> Expr {
+    fn unary(&mut self) -> Option<Expr> {
         let mut res = None;
         while self.is_equal(vec![LexemeKind::BANG, LexemeKind::MINUS]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
-            res = Some(Expr::Unary(ExprUnary { operator, right: Box::new(right) }))
+            res = Some(Expr::Unary(ExprUnary {
+                operator,
+                right: Box::new(right.unwrap()),
+            }))
         }
 
-        if res.is_some() { res.unwrap() } else { self.primary() }
+        if res.is_some() {
+            res
+        } else {
+            self.primary()
+        }
     }
 
-    fn primary(&mut self) -> Expr {
+    fn primary(&mut self) -> Option<Expr> {
         let token = self.tokens.get(self.cursor).unwrap();
         match &token.lexeme {
             LexemeKind::FALSE => {
                 self.cursor += 1;
-                Expr::Literal(ExprLiteral::BOOLEAN(false))
+                Some(Expr::Literal(ExprLiteral::BOOLEAN(false)))
             }
             LexemeKind::TRUE => {
                 self.cursor += 1;
-                Expr::Literal(ExprLiteral::BOOLEAN(true))
+                Some(Expr::Literal(ExprLiteral::BOOLEAN(true)))
             }
             LexemeKind::STRING(st) => {
                 self.cursor += 1;
-                Expr::Literal(ExprLiteral::STRING(st.to_string()))
+                Some(Expr::Literal(ExprLiteral::STRING(st.to_string())))
             }
             LexemeKind::NUMBER(num) => {
                 self.cursor += 1;
-                Expr::Literal(ExprLiteral::NUMBER(*num))
+                Some(Expr::Literal(ExprLiteral::NUMBER(*num)))
             }
             LexemeKind::LEFT_PAREN => {
                 self.cursor += 1;
                 let expr = self.expression();
+
                 self.expect(LexemeKind::RIGHT_PAREN);
-                Expr::Grouping(ExprGrouping { value: Box::new(expr) })
+
+                Some(Expr::Grouping(ExprGrouping {
+                    value: Box::new(expr.unwrap()),
+                }))
             }
-            _ => todo!()
+            _ => self.error(),
         }
     }
 }
@@ -189,24 +222,48 @@ mod test {
     #[test]
     fn it_works() {
         let tokens = Scanner::new("1+1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse();
-        assert_eq!(ast, Expr::Binary(ExprBinary {
-            left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
-            operator: LexemeKind::PLUS,
-            right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
-        }));
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Binary(ExprBinary {
+                left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                operator: LexemeKind::PLUS,
+                right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+            })
+        );
     }
 
     #[test]
     fn it_works_parenthesized_expression() {
         let tokens = Scanner::new("(1+1)".to_owned()).collect();
-        let ast = Parser::new(tokens).parse();
-        assert_eq!(ast, Expr::Grouping(ExprGrouping {
-            value: Box::new(Expr::Binary(ExprBinary {
-                left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Grouping(ExprGrouping {
+                value: Box::new(Expr::Binary(ExprBinary {
+                    left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                    operator: LexemeKind::PLUS,
+                    right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                })),
+            })
+        );
+    }
+
+    #[test]
+    fn it_errors() {
+        let tokens = Scanner::new("+1+1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Binary(ExprBinary {
+                left: Box::new(Expr::Binary(ExprBinary {
+                    left: Box::new(Expr::Error),
+                    operator: LexemeKind::PLUS,
+                    right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0)))
+                })),
                 operator: LexemeKind::PLUS,
                 right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
-            })),
-        }));
+            })
+        );
     }
 }
