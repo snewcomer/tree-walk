@@ -1,75 +1,14 @@
+pub(crate) mod expression;
+
 use crate::lexer::{LexemeKind, Scanner, Token};
+use expression::Expr;
 
-#[derive(Debug, PartialEq)]
-pub enum Expr {
-    Binary {
-        left: Box<Expr>,
-        operator: LexemeKind,
-        right: Box<Expr>,
-    },
-    BOOLEAN(bool),
-    STRING(String),
-    NUMBER(f64),
-    Unary {
-        operator: LexemeKind,
-        right: Box<Expr>,
-    },
-    Grouping(Box<Expr>),
-    Error,
-}
-
-impl Expr {
-    fn debug(&self) -> String {
-        match &self {
-            Expr::Binary { operator, left, right } => {
-                let mut st = String::new();
-                st.push_str("(");
-
-                let op = operator.to_string();
-                st.push_str(&op);
-                st.push_str(" ");
-
-                let l = &(*left).debug();
-                st.push_str(l);
-                st.push_str(" ");
-
-                let r = &(*right).debug();
-                st.push_str(r);
-
-                st
-            },
-            Expr::BOOLEAN(true) => "true".to_string(),
-            Expr::BOOLEAN(false) => "true".to_string(),
-            Expr::STRING(st) => st.to_string(),
-            Expr::NUMBER(n) => n.to_string(),
-            Expr::Unary { operator, right } => {
-                let mut st = String::new();
-                st.push_str("( ");
-
-                let op = operator.to_string();
-                st.push_str(&op);
-                st.push_str(" ");
-
-                let r = &(*right).debug();
-                st.push_str(r);
-                st.push_str(" ");
-
-                st
-            },
-            Expr::Grouping(value) => {
-                value.debug()
-            },
-            Expr::Error => "~ERROR~".to_string(),
-        }
-    }
-}
-
-pub struct Parser {
+pub(crate) struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
 }
 
-pub fn debug_tree(ast: Expr) -> String {
+pub(crate) fn debug_tree(ast: Expr) -> String {
     let mut st = String::new();
     st.push_str("(");
     if let Expr::Binary {
@@ -97,13 +36,13 @@ pub fn debug_tree(ast: Expr) -> String {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub(crate) fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, cursor: 0 }
     }
 
     // TODO: Do we need to return Options up the chain?  Did this to take advantage of ! error
     // handling but not exactly sure of my strategy
-    pub fn parse(&mut self) -> Option<Expr> {
+    pub(crate) fn parse(&mut self) -> Option<Expr> {
         self.expression()
     }
 
@@ -283,7 +222,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn it_handles_binary() {
         let tokens = Scanner::new("1+1".to_owned()).collect();
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
@@ -294,6 +233,43 @@ mod test {
                 right: Box::new(Expr::NUMBER(1.0)),
             }
         );
+    }
+
+    #[test]
+    fn it_handles_comparison() {
+        let tokens = Scanner::new("1 >= 2".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Binary {
+                left: Box::new(Expr::NUMBER(1.0)),
+                operator: LexemeKind::GREATER_EQUAL,
+                right: Box::new(Expr::NUMBER(2.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn it_handles_unary() {
+        let tokens = Scanner::new("-1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Unary {
+                operator: LexemeKind::MINUS,
+                right: Box::new(Expr::NUMBER(1.0)),
+            }
+        );
+
+        // let tokens = Scanner::new("+1".to_owned()).collect();
+        // let ast = Parser::new(tokens).parse().unwrap();
+        // assert_eq!(
+        //     ast,
+        //     Expr::Unary {
+        //         operator: LexemeKind::MINUS,
+        //         right: Box::new(Expr::NUMBER(1.0)),
+        //     }
+        // );
     }
 
     #[test]
