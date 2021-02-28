@@ -51,7 +51,7 @@ fn run_file<P: AsRef<path::Path> + fmt::Display>(filename: P) -> TWResult<()> {
 fn run(source: String) -> TWResult<()> {
     let tokens = Scanner::new(source).collect();
 
-    let mut parser = Parser::new(tokens);
+    let mut parser = Parser::new(tokens); // vec![token1, token2]
     let ast = parser.parse().unwrap();
 
     println!("{:?}", parser::debug_tree(ast));

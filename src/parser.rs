@@ -2,80 +2,62 @@ use crate::lexer::{LexemeKind, Scanner, Token};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    Binary(ExprBinary),
+    Binary {
+        left: Box<Expr>,
+        operator: LexemeKind,
+        right: Box<Expr>,
+    },
     Literal(ExprLiteral),
-    Unary(ExprUnary),
-    Grouping(ExprGrouping),
+    Unary {
+        operator: LexemeKind,
+        right: Box<Expr>,
+    },
+    Grouping {
+        value: Box<Expr>,
+    },
     Error,
 }
 
 impl Expr {
     fn debug(&self) -> String {
         match &self {
-            Expr::Binary(variant) => variant.debug(),
+            Expr::Binary { operator, left, right } => {
+                let mut st = String::new();
+                st.push_str("(");
+
+                let op = operator.to_string();
+                st.push_str(&op);
+                st.push_str(" ");
+
+                let l = &(*left).debug();
+                st.push_str(l);
+                st.push_str(" ");
+
+                let r = &(*right).debug();
+                st.push_str(r);
+
+                st
+            },
             Expr::Literal(variant) => variant.debug(),
-            Expr::Unary(variant) => variant.debug(),
-            Expr::Grouping(variant) => variant.debug(),
+            Expr::Unary { operator, right } => {
+                let mut st = String::new();
+                st.push_str("( ");
+
+                let op = operator.to_string();
+                st.push_str(&op);
+                st.push_str(" ");
+
+                let r = &(*right).debug();
+                st.push_str(r);
+                st.push_str(" ");
+
+                st
+            },
+            Expr::Grouping { value } => {
+                value.debug()
+            }
             Expr::Error => "~ERROR~".to_string(),
         }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ExprBinary {
-    left: Box<Expr>,
-    operator: LexemeKind,
-    right: Box<Expr>,
-}
-
-impl ExprBinary {
-    fn debug(&self) -> String {
-        let mut st = String::new();
-        st.push_str("(");
-
-        let Self {
-            left,
-            operator,
-            right,
-        } = self;
-
-        let op = operator.to_string();
-        st.push_str(&op);
-        st.push_str(" ");
-
-        let l = &(*left).debug();
-        st.push_str(l);
-        st.push_str(" ");
-
-        let r = &(*right).debug();
-        st.push_str(r);
-
-        st
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ExprUnary {
-    operator: LexemeKind,
-    right: Box<Expr>,
-}
-
-impl ExprUnary {
-    fn debug(&self) -> String {
-        let mut st = String::new();
-        st.push_str("( ");
-
-        let Self { operator, right } = self;
-
-        let op = operator.to_string();
-        st.push_str(&op);
-        st.push_str(" ");
-
-        let r = &(*right).debug();
-        st.push_str(r);
-        st.push_str(" ");
-
-        st
     }
 }
 
@@ -97,19 +79,6 @@ impl ExprLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct ExprGrouping {
-    value: Box<Expr>,
-}
-
-impl ExprGrouping {
-    fn debug(&self) -> String {
-        let Self { value } = self;
-
-        value.debug()
-    }
-}
-
 pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
@@ -118,11 +87,11 @@ pub struct Parser {
 pub fn debug_tree(ast: Expr) -> String {
     let mut st = String::new();
     st.push_str("(");
-    if let Expr::Binary(ExprBinary {
+    if let Expr::Binary {
         left,
         operator,
         right,
-    }) = ast
+    } = ast
     {
         let op = operator.to_string();
         st.push_str(&op);
@@ -201,11 +170,11 @@ impl Parser {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.comparison();
-            expr = Some(Expr::Binary(ExprBinary {
+            expr = Some(Expr::Binary {
                 left: Box::new(expr.unwrap()),
                 operator,
                 right: Box::new(right.unwrap()),
-            }))
+            })
         }
 
         expr
@@ -221,13 +190,15 @@ impl Parser {
             LexemeKind::LESS_EQUAL,
         ]) {
             let operator = self.peek_kind().unwrap();
+
             self.cursor += 1;
+
             let right = self.term();
-            expr = Some(Expr::Binary(ExprBinary {
+            expr = Some(Expr::Binary {
                 left: Box::new(expr.unwrap()),
                 operator,
                 right: Box::new(right.unwrap()),
-            }))
+            })
         }
 
         expr
@@ -238,13 +209,15 @@ impl Parser {
 
         while self.is_equal(vec![LexemeKind::MINUS, LexemeKind::PLUS]) {
             let operator = self.peek_kind().unwrap();
+
             self.cursor += 1;
+
             let right = self.factor();
-            expr = Some(Expr::Binary(ExprBinary {
-                left: Box::new(expr.unwrap()),
-                operator,
-                right: Box::new(right.unwrap()),
-            }))
+            expr = Some(Expr::Binary {
+                left: Box::new(expr.unwrap()), // 1
+                operator, // +
+                right: Box::new(right.unwrap()), // 1
+            })
         }
 
         expr
@@ -257,11 +230,11 @@ impl Parser {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
-            expr = Some(Expr::Binary(ExprBinary {
+            expr = Some(Expr::Binary {
                 left: Box::new(expr.unwrap()),
                 operator,
                 right: Box::new(right.unwrap()),
-            }))
+            })
         }
 
         expr
@@ -273,10 +246,10 @@ impl Parser {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
-            res = Some(Expr::Unary(ExprUnary {
+            res = Some(Expr::Unary {
                 operator,
                 right: Box::new(right.unwrap()),
-            }))
+            })
         }
 
         if res.is_some() {
@@ -311,9 +284,9 @@ impl Parser {
 
                 self.expect(LexemeKind::RIGHT_PAREN);
 
-                Some(Expr::Grouping(ExprGrouping {
+                Some(Expr::Grouping {
                     value: Box::new(expr.unwrap()),
-                }))
+                })
             }
             _ => self.error(),
         }
@@ -330,11 +303,11 @@ mod test {
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
-            Expr::Binary(ExprBinary {
+            Expr::Binary {
                 left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
                 operator: LexemeKind::PLUS,
                 right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
-            })
+            }
         );
     }
 
@@ -344,13 +317,13 @@ mod test {
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
-            Expr::Grouping(ExprGrouping {
-                value: Box::new(Expr::Binary(ExprBinary {
+            Expr::Grouping {
+                value: Box::new(Expr::Binary {
                     left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
                     operator: LexemeKind::PLUS,
                     right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
-                })),
-            })
+                }),
+            }
         );
     }
 
@@ -360,15 +333,15 @@ mod test {
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
-            Expr::Binary(ExprBinary {
-                left: Box::new(Expr::Binary(ExprBinary {
+            Expr::Binary {
+                left: Box::new(Expr::Binary {
                     left: Box::new(Expr::Error),
                     operator: LexemeKind::PLUS,
                     right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0)))
-                })),
+                }),
                 operator: LexemeKind::PLUS,
                 right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
-            })
+            }
         );
     }
 }
