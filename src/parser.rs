@@ -7,7 +7,9 @@ pub enum Expr {
         operator: LexemeKind,
         right: Box<Expr>,
     },
-    Literal(ExprLiteral),
+    BOOLEAN(bool),
+    STRING(String),
+    NUMBER(f64),
     Unary {
         operator: LexemeKind,
         right: Box<Expr>,
@@ -38,7 +40,10 @@ impl Expr {
 
                 st
             },
-            Expr::Literal(variant) => variant.debug(),
+            Expr::BOOLEAN(true) => "true".to_string(),
+            Expr::BOOLEAN(false) => "true".to_string(),
+            Expr::STRING(st) => st.to_string(),
+            Expr::NUMBER(n) => n.to_string(),
             Expr::Unary { operator, right } => {
                 let mut st = String::new();
                 st.push_str("( ");
@@ -57,24 +62,6 @@ impl Expr {
                 value.debug()
             }
             Expr::Error => "~ERROR~".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ExprLiteral {
-    BOOLEAN(bool),
-    STRING(String),
-    NUMBER(f64),
-}
-
-impl ExprLiteral {
-    fn debug(&self) -> String {
-        match self {
-            ExprLiteral::BOOLEAN(true) => "true".to_string(),
-            ExprLiteral::BOOLEAN(false) => "true".to_string(),
-            ExprLiteral::STRING(st) => st.to_string(),
-            ExprLiteral::NUMBER(n) => n.to_string(),
         }
     }
 }
@@ -264,19 +251,19 @@ impl Parser {
         match &token.lexeme {
             LexemeKind::FALSE => {
                 self.cursor += 1;
-                Some(Expr::Literal(ExprLiteral::BOOLEAN(false)))
+                Some(Expr::BOOLEAN(false))
             }
             LexemeKind::TRUE => {
                 self.cursor += 1;
-                Some(Expr::Literal(ExprLiteral::BOOLEAN(true)))
+                Some(Expr::BOOLEAN(true))
             }
             LexemeKind::STRING(st) => {
                 self.cursor += 1;
-                Some(Expr::Literal(ExprLiteral::STRING(st.to_string())))
+                Some(Expr::STRING(st.to_string()))
             }
             LexemeKind::NUMBER(num) => {
                 self.cursor += 1;
-                Some(Expr::Literal(ExprLiteral::NUMBER(*num)))
+                Some(Expr::NUMBER(*num))
             }
             LexemeKind::LEFT_PAREN => {
                 self.cursor += 1;
@@ -304,9 +291,9 @@ mod test {
         assert_eq!(
             ast,
             Expr::Binary {
-                left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                left: Box::new(Expr::NUMBER(1.0)),
                 operator: LexemeKind::PLUS,
-                right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                right: Box::new(Expr::NUMBER(1.0)),
             }
         );
     }
@@ -319,9 +306,9 @@ mod test {
             ast,
             Expr::Grouping {
                 value: Box::new(Expr::Binary {
-                    left: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                    left: Box::new(Expr::NUMBER(1.0)),
                     operator: LexemeKind::PLUS,
-                    right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                    right: Box::new(Expr::NUMBER(1.0)),
                 }),
             }
         );
@@ -337,10 +324,10 @@ mod test {
                 left: Box::new(Expr::Binary {
                     left: Box::new(Expr::Error),
                     operator: LexemeKind::PLUS,
-                    right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0)))
+                    right: Box::new(Expr::NUMBER(1.0))
                 }),
                 operator: LexemeKind::PLUS,
-                right: Box::new(Expr::Literal(ExprLiteral::NUMBER(1.0))),
+                right: Box::new(Expr::NUMBER(1.0)),
             }
         );
     }
