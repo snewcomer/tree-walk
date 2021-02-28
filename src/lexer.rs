@@ -55,6 +55,53 @@ pub enum LexemeKind {
     EOF,
 }
 
+impl LexemeKind {
+    pub fn to_string(&self) -> String {
+        match &self {
+            Self::LEFT_PAREN => "(".to_owned(),
+            Self::RIGHT_PAREN => ")".to_owned(),
+            Self::LEFT_BRACE => "{".to_owned(),
+            Self::RIGHT_BRACE => "}".to_owned(),
+            Self::COMMA => ".".to_owned(),
+            Self::DOT => ".".to_owned(),
+            Self::MINUS => "-".to_owned(),
+            Self::PLUS => "+".to_owned(),
+            Self::SEMICOLON => ";".to_owned(),
+            Self::SLASH => "/".to_owned(),
+            Self::STAR => "*".to_owned(),
+            Self::BANG => "!".to_owned(),
+            Self::BANG_EQUAL => "!!".to_owned(),
+            Self::EQUAL => "=".to_owned(),
+            Self::EQUAL_EQUAL => "==".to_owned(),
+            Self::GREATER => ">".to_owned(),
+            Self::GREATER_EQUAL => ">=".to_owned(),
+            Self::LESS => "<".to_owned(),
+            Self::LESS_EQUAL => "<=".to_owned(),
+            Self::IDENTIFIER(i) => i.to_owned(),
+            Self::STRING(s) => format!("\"{}\"", s),
+            Self::NUMBER(n) => n.to_string(),
+            Self::AND => "and".to_owned(),
+            Self::CLASS => "class".to_owned(),
+            Self::ELSE => "else".to_owned(),
+            Self::FALSE => "false".to_owned(),
+            Self::FUN => "fun".to_owned(),
+            Self::FOR => "for".to_owned(),
+            Self::IF => "if".to_owned(),
+            Self::NIL => "nil".to_owned(),
+            Self::OR => "or".to_owned(),
+            Self::PRINT => "print".to_owned(),
+            Self::RETURN => "return".to_owned(),
+            Self::SUPER => "super".to_owned(),
+            Self::THIS => "this".to_owned(),
+            Self::TRUE => "true".to_owned(),
+            Self::VAR => "var".to_owned(),
+            Self::WHILE => "while".to_owned(),
+            Self::EOF => "<EOF>".to_owned(),
+            Self::UNEXPECTED => "~UNEXPECTED~".to_owned(),
+        }
+    }
+}
+
 impl fmt::Display for LexemeKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)

@@ -14,9 +14,7 @@ pub enum Expr {
         operator: LexemeKind,
         right: Box<Expr>,
     },
-    Grouping {
-        value: Box<Expr>,
-    },
+    Grouping(Box<Expr>),
     Error,
 }
 
@@ -58,9 +56,9 @@ impl Expr {
 
                 st
             },
-            Expr::Grouping { value } => {
+            Expr::Grouping(value) => {
                 value.debug()
-            }
+            },
             Expr::Error => "~ERROR~".to_string(),
         }
     }
@@ -271,9 +269,9 @@ impl Parser {
 
                 self.expect(LexemeKind::RIGHT_PAREN);
 
-                Some(Expr::Grouping {
-                    value: Box::new(expr.unwrap()),
-                })
+                Some(Expr::Grouping(
+                    Box::new(expr.unwrap()),
+                ))
             }
             _ => self.error(),
         }
@@ -299,18 +297,38 @@ mod test {
     }
 
     #[test]
+    fn it_errors_keyword() {
+        let tokens = Scanner::new("and".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Error
+        );
+    }
+
+    #[test]
+    fn not_expression() {
+        let tokens = Scanner::new("a".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Error
+        );
+    }
+
+    #[test]
     fn it_works_parenthesized_expression() {
         let tokens = Scanner::new("(1+1)".to_owned()).collect();
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
-            Expr::Grouping {
-                value: Box::new(Expr::Binary {
+            Expr::Grouping(
+                Box::new(Expr::Binary {
                     left: Box::new(Expr::NUMBER(1.0)),
                     operator: LexemeKind::PLUS,
                     right: Box::new(Expr::NUMBER(1.0)),
                 }),
-            }
+            )
         );
     }
 
