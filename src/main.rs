@@ -1,8 +1,11 @@
 mod lexer;
 mod parser;
+mod interpreter;
+mod visitor;
 
 use lexer::Scanner;
 use parser::Parser;
+use interpreter::Interpreter;
 
 use std::env;
 use std::fmt;
@@ -55,6 +58,8 @@ fn run(source: String) -> TWResult<()> {
     let ast = parser.parse().unwrap();
 
     println!("{:?}", parser::debug_tree(ast));
+
+    Interpreter.evaluate(ast);
 
     Ok(())
 }
