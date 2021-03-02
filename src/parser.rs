@@ -1,7 +1,7 @@
 pub(crate) mod expression;
 
-use crate::lexer::{LexemeKind, Scanner, Token};
-use expression::Expr;
+use crate::lexer::{LexemeKind, Token};
+pub use expression::{Expr, Value};
 
 pub(crate) struct Parser {
     tokens: Vec<Token>,
@@ -90,7 +90,7 @@ impl Parser {
     fn equality(&mut self) -> Option<Expr> {
         let mut expr = self.comparison();
 
-        while self.is_equal(vec![LexemeKind::BANG_EQUAL, LexemeKind::EQUAL_EQUAL]) {
+        while self.is_equal(vec![LexemeKind::BangEqual, LexemeKind::EqualEqual]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.comparison();
@@ -108,10 +108,10 @@ impl Parser {
         let mut expr = self.term();
 
         while self.is_equal(vec![
-            LexemeKind::GREATER,
-            LexemeKind::GREATER_EQUAL,
-            LexemeKind::LESS,
-            LexemeKind::LESS_EQUAL,
+            LexemeKind::Greater,
+            LexemeKind::GreaterEqual,
+            LexemeKind::Less,
+            LexemeKind::LessEqual,
         ]) {
             let operator = self.peek_kind().unwrap();
 
@@ -131,7 +131,7 @@ impl Parser {
     fn term(&mut self) -> Option<Expr> {
         let mut expr = self.factor();
 
-        while self.is_equal(vec![LexemeKind::MINUS, LexemeKind::PLUS]) {
+        while self.is_equal(vec![LexemeKind::Minus, LexemeKind::Plus]) {
             let operator = self.peek_kind().unwrap();
 
             self.cursor += 1;
@@ -150,7 +150,7 @@ impl Parser {
     fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
 
-        while self.is_equal(vec![LexemeKind::SLASH, LexemeKind::STAR]) {
+        while self.is_equal(vec![LexemeKind::Slash, LexemeKind::STAR]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
@@ -166,7 +166,7 @@ impl Parser {
 
     fn unary(&mut self) -> Option<Expr> {
         let mut res = None;
-        while self.is_equal(vec![LexemeKind::BANG, LexemeKind::MINUS]) {
+        while self.is_equal(vec![LexemeKind::Bang, LexemeKind::Minus]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
@@ -188,25 +188,25 @@ impl Parser {
         match &token.lexeme {
             LexemeKind::FALSE => {
                 self.cursor += 1;
-                Some(Expr::BOOLEAN(false))
+                Some(Expr::Literal(Value::BOOLEAN(false)))
             }
             LexemeKind::TRUE => {
                 self.cursor += 1;
-                Some(Expr::BOOLEAN(true))
+                Some(Expr::Literal(Value::BOOLEAN(true)))
             }
             LexemeKind::STRING(st) => {
                 self.cursor += 1;
-                Some(Expr::STRING(st.to_string()))
+                Some(Expr::Literal(Value::STRING(st.to_string())))
             }
             LexemeKind::NUMBER(num) => {
                 self.cursor += 1;
-                Some(Expr::NUMBER(*num))
+                Some(Expr::Literal(Value::NUMBER(*num)))
             }
-            LexemeKind::LEFT_PAREN => {
+            LexemeKind::LeftParen => {
                 self.cursor += 1;
                 let expr = self.expression();
 
-                self.expect(LexemeKind::RIGHT_PAREN);
+                self.expect(LexemeKind::RightParen);
 
                 Some(Expr::Grouping(
                     Box::new(expr.unwrap()),
@@ -220,6 +220,7 @@ impl Parser {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::lexer::Scanner;
 
     #[test]
     fn it_handles_binary() {
@@ -229,7 +230,18 @@ mod test {
             ast,
             Expr::Binary {
                 left: Box::new(Expr::NUMBER(1.0)),
-                operator: LexemeKind::PLUS,
+                operator: LexemeKind::Plus,
+                right: Box::new(Expr::NUMBER(1.0)),
+            }
+        );
+
+        let tokens = Scanner::new("1 == 1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Binary {
+                left: Box::new(Expr::NUMBER(1.0)),
+                operator: LexemeKind::EqualEqual,
                 right: Box::new(Expr::NUMBER(1.0)),
             }
         );
@@ -243,7 +255,18 @@ mod test {
             ast,
             Expr::Binary {
                 left: Box::new(Expr::NUMBER(1.0)),
-                operator: LexemeKind::GREATER_EQUAL,
+                operator: LexemeKind::GreaterEqual,
+                right: Box::new(Expr::NUMBER(2.0)),
+            }
+        );
+
+        let tokens = Scanner::new("1 <= 2".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Binary {
+                left: Box::new(Expr::NUMBER(1.0)),
+                operator: LexemeKind::LessEqual,
                 right: Box::new(Expr::NUMBER(2.0)),
             }
         );
@@ -256,7 +279,7 @@ mod test {
         assert_eq!(
             ast,
             Expr::Unary {
-                operator: LexemeKind::MINUS,
+                operator: LexemeKind::Minus,
                 right: Box::new(Expr::NUMBER(1.0)),
             }
         );
@@ -266,7 +289,7 @@ mod test {
         // assert_eq!(
         //     ast,
         //     Expr::Unary {
-        //         operator: LexemeKind::MINUS,
+        //         operator: LexemeKind::Minus,
         //         right: Box::new(Expr::NUMBER(1.0)),
         //     }
         // );
@@ -301,7 +324,7 @@ mod test {
             Expr::Grouping(
                 Box::new(Expr::Binary {
                     left: Box::new(Expr::NUMBER(1.0)),
-                    operator: LexemeKind::PLUS,
+                    operator: LexemeKind::Plus,
                     right: Box::new(Expr::NUMBER(1.0)),
                 }),
             )
@@ -317,10 +340,10 @@ mod test {
             Expr::Binary {
                 left: Box::new(Expr::Binary {
                     left: Box::new(Expr::Error),
-                    operator: LexemeKind::PLUS,
+                    operator: LexemeKind::Plus,
                     right: Box::new(Expr::NUMBER(1.0))
                 }),
-                operator: LexemeKind::PLUS,
+                operator: LexemeKind::Plus,
                 right: Box::new(Expr::NUMBER(1.0)),
             }
         );
