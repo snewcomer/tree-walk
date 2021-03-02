@@ -150,7 +150,7 @@ impl Parser {
     fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
 
-        while self.is_equal(vec![LexemeKind::Slash, LexemeKind::STAR]) {
+        while self.is_equal(vec![LexemeKind::Slash, LexemeKind::Star]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();
@@ -229,9 +229,9 @@ mod test {
         assert_eq!(
             ast,
             Expr::Binary {
-                left: Box::new(Expr::NUMBER(1.0)),
+                left: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                 operator: LexemeKind::Plus,
-                right: Box::new(Expr::NUMBER(1.0)),
+                right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             }
         );
 
@@ -240,23 +240,23 @@ mod test {
         assert_eq!(
             ast,
             Expr::Binary {
-                left: Box::new(Expr::NUMBER(1.0)),
+                left: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                 operator: LexemeKind::EqualEqual,
-                right: Box::new(Expr::NUMBER(1.0)),
+                right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             }
         );
     }
 
     #[test]
-    fn it_handles_comparison() {
+    fn xssfdit_handles_co() {
         let tokens = Scanner::new("1 >= 2".to_owned()).collect();
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
             Expr::Binary {
-                left: Box::new(Expr::NUMBER(1.0)),
+                left: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                 operator: LexemeKind::GreaterEqual,
-                right: Box::new(Expr::NUMBER(2.0)),
+                right: Box::new(Expr::Literal(Value::NUMBER(2.0))),
             }
         );
 
@@ -265,9 +265,9 @@ mod test {
         assert_eq!(
             ast,
             Expr::Binary {
-                left: Box::new(Expr::NUMBER(1.0)),
+                left: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                 operator: LexemeKind::LessEqual,
-                right: Box::new(Expr::NUMBER(2.0)),
+                right: Box::new(Expr::Literal(Value::NUMBER(2.0))),
             }
         );
     }
@@ -280,7 +280,7 @@ mod test {
             ast,
             Expr::Unary {
                 operator: LexemeKind::Minus,
-                right: Box::new(Expr::NUMBER(1.0)),
+                right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             }
         );
 
@@ -290,7 +290,7 @@ mod test {
         //     ast,
         //     Expr::Unary {
         //         operator: LexemeKind::Minus,
-        //         right: Box::new(Expr::NUMBER(1.0)),
+        //         right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
         //     }
         // );
     }
@@ -323,9 +323,9 @@ mod test {
             ast,
             Expr::Grouping(
                 Box::new(Expr::Binary {
-                    left: Box::new(Expr::NUMBER(1.0)),
+                    left: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                     operator: LexemeKind::Plus,
-                    right: Box::new(Expr::NUMBER(1.0)),
+                    right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                 }),
             )
         );
@@ -341,10 +341,10 @@ mod test {
                 left: Box::new(Expr::Binary {
                     left: Box::new(Expr::Error),
                     operator: LexemeKind::Plus,
-                    right: Box::new(Expr::NUMBER(1.0))
+                    right: Box::new(Expr::Literal(Value::NUMBER(1.0)))
                 }),
                 operator: LexemeKind::Plus,
-                right: Box::new(Expr::NUMBER(1.0)),
+                right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             }
         );
     }

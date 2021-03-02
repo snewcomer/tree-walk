@@ -1,15 +1,14 @@
 use crate::lexer::LexemeKind;
+use crate::visitor::Visitor;
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum Expr {
+pub enum Expr {
     Binary {
         left: Box<Expr>,
         operator: LexemeKind,
         right: Box<Expr>,
     },
-    BOOLEAN(bool),
-    STRING(String),
-    NUMBER(f64),
+    Literal(Value),
     Unary {
         operator: LexemeKind,
         right: Box<Expr>,
@@ -18,7 +17,34 @@ pub(crate) enum Expr {
     Error,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    BOOLEAN(bool),
+    STRING(String),
+    NUMBER(f64),
+}
+
 impl Expr {
+    pub(crate) fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
+        match &*self {
+            Expr::Binary { operator, ref left, ref right } => {
+                visitor.visit_binary(left, operator, right)
+            }
+            Expr::Unary { operator, ref right } => {
+                visitor.visit_unary(operator, right)
+            }
+            Expr::Grouping(ref val) => {
+                visitor.visit_grouping(val)
+            }
+            Expr::Literal(v) => {
+                visitor.visit_literal(v)
+            }
+            Expr::Error => {
+                visitor.visit_error()
+            }
+        }
+    }
+
     pub(crate) fn debug(&self) -> String {
         match &self {
             Expr::Binary { operator, left, right } => {
@@ -38,10 +64,14 @@ impl Expr {
 
                 st
             },
-            Expr::BOOLEAN(true) => "true".to_string(),
-            Expr::BOOLEAN(false) => "true".to_string(),
-            Expr::STRING(st) => st.to_string(),
-            Expr::NUMBER(n) => n.to_string(),
+            Expr::Literal(v) => {
+                match v {
+                    Value::BOOLEAN(true) => "true".to_string(),
+                    Value::BOOLEAN(false) => "true".to_string(),
+                    Value::STRING(st) => st.to_string(),
+                    Value::NUMBER(n) => n.to_string(),
+                }
+            }
             Expr::Unary { operator, right } => {
                 let mut st = String::new();
                 st.push_str("( ");
