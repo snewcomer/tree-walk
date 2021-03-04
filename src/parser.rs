@@ -150,7 +150,7 @@ impl Parser {
     fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
 
-        while self.is_equal(vec![LexemeKind::Slash, LexemeKind::STAR]) {
+        while self.is_equal(vec![LexemeKind::Slash, LexemeKind::Star]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
             let right = self.unary();

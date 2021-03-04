@@ -15,7 +15,7 @@ pub enum LexemeKind {
     Plus,
     Semicolon,
     Slash,
-    STAR,
+    Star,
 
     // One or two character tokens.
     Bang,
@@ -68,7 +68,7 @@ impl LexemeKind {
             Self::Plus => "+".to_owned(),
             Self::Semicolon => ";".to_owned(),
             Self::Slash => "/".to_owned(),
-            Self::STAR => "*".to_owned(),
+            Self::Star => "*".to_owned(),
             Self::Bang => "!".to_owned(),
             Self::BangEqual => "!!".to_owned(),
             Self::Equal => "=".to_owned(),
@@ -246,7 +246,7 @@ impl Iterator for Scanner {
             '-' => Some(Token::new(LexemeKind::Minus, self.line)),
             '+' => Some(Token::new(LexemeKind::Plus, self.line)),
             ';' => Some(Token::new(LexemeKind::Semicolon, self.line)),
-            '*' => Some(Token::new(LexemeKind::STAR, self.line)),
+            '*' => Some(Token::new(LexemeKind::Star, self.line)),
             '!' => {
                 let next = self.peek_next();
                 Some(Token::new(

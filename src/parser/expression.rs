@@ -17,6 +17,7 @@ pub enum Expr {
     Error,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Value {
     BOOLEAN(bool),
     STRING(String),
@@ -38,6 +39,7 @@ impl Expr {
             Expr::Literal(v) => {
                 visitor.visit_literal(v)
             }
+            Expr::Error => todo!()
         }
     }
 
@@ -60,7 +62,7 @@ impl Expr {
 
                 st
             },
-            Expr::Value(v) => {
+            Expr::Literal(v) => {
                 match v {
                     Value::BOOLEAN(true) => "true".to_string(),
                     Value::BOOLEAN(false) => "true".to_string(),

@@ -57,7 +57,7 @@ fn run(source: String) -> TWResult<()> {
     let mut parser = Parser::new(tokens); // vec![token1, token2]
     let ast = parser.parse().unwrap();
 
-    println!("{:?}", parser::debug_tree(ast));
+    // println!("{:?}", parser::debug_tree(ast));
 
     Interpreter.evaluate(ast);
 
