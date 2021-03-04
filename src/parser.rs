@@ -8,7 +8,7 @@ pub(crate) struct Parser {
     cursor: usize,
 }
 
-pub(crate) fn debug_tree(ast: Expr) -> String {
+pub(crate) fn debug_tree<T>(ast: Expr<T>) -> String {
     let mut st = String::new();
     st.push_str("(");
     if let Expr::Binary {
@@ -42,7 +42,10 @@ impl Parser {
 
     // TODO: Do we need to return Options up the chain?  Did this to take advantage of ! error
     // handling but not exactly sure of my strategy
-    pub(crate) fn parse(&mut self) -> Option<Expr> {
+    pub(crate) fn parse<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         self.expression()
     }
 
@@ -74,7 +77,10 @@ impl Parser {
         self.peek_kind() == Some(kind)
     }
 
-    fn error(&self) -> Option<Expr> {
+    fn error<T>(&self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         Some(Expr::Error)
     }
 
@@ -83,11 +89,17 @@ impl Parser {
         res.is_some()
     }
 
-    fn expression(&mut self) -> Option<Expr> {
+    fn expression<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         self.equality()
     }
 
-    fn equality(&mut self) -> Option<Expr> {
+    fn equality<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         let mut expr = self.comparison();
 
         while self.is_equal(vec![LexemeKind::BangEqual, LexemeKind::EqualEqual]) {
@@ -104,7 +116,10 @@ impl Parser {
         expr
     }
 
-    fn comparison(&mut self) -> Option<Expr> {
+    fn comparison<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         let mut expr = self.term();
 
         while self.is_equal(vec![
@@ -128,7 +143,10 @@ impl Parser {
         expr
     }
 
-    fn term(&mut self) -> Option<Expr> {
+    fn term<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         let mut expr = self.factor();
 
         while self.is_equal(vec![LexemeKind::Minus, LexemeKind::Plus]) {
@@ -147,7 +165,10 @@ impl Parser {
         expr
     }
 
-    fn factor(&mut self) -> Option<Expr> {
+    fn factor<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         let mut expr = self.unary();
 
         while self.is_equal(vec![LexemeKind::Slash, LexemeKind::Star]) {
@@ -164,7 +185,10 @@ impl Parser {
         expr
     }
 
-    fn unary(&mut self) -> Option<Expr> {
+    fn unary<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         let mut res = None;
         while self.is_equal(vec![LexemeKind::Bang, LexemeKind::Minus]) {
             let operator = self.peek_kind().unwrap();
@@ -183,24 +207,28 @@ impl Parser {
         }
     }
 
-    fn primary(&mut self) -> Option<Expr> {
+    // TODO: need to scope generic T to Value
+    fn primary<T>(&mut self) -> Option<Expr<T>>
+    where
+        T: std::fmt::Display
+    {
         let token = self.tokens.get(self.cursor).unwrap();
         match &token.lexeme {
             LexemeKind::FALSE => {
                 self.cursor += 1;
-                Some(Expr::Literal(Value::BOOLEAN(false)))
+                Some(Expr::Literal(Value(false)))
             }
             LexemeKind::TRUE => {
                 self.cursor += 1;
-                Some(Expr::Literal(Value::BOOLEAN(true)))
+                Some(Expr::Literal(Value(true)))
             }
             LexemeKind::STRING(st) => {
                 self.cursor += 1;
-                Some(Expr::Literal(Value::STRING(st.to_string())))
+                Some(Expr::Literal(Value(st.to_string())))
             }
             LexemeKind::NUMBER(num) => {
                 self.cursor += 1;
-                Some(Expr::Literal(Value::NUMBER(*num)))
+                Some(Expr::Literal(Value(*num)))
             }
             LexemeKind::LeftParen => {
                 self.cursor += 1;

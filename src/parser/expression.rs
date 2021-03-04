@@ -1,31 +1,45 @@
+use std::fmt;
+use std::ops::Deref;
 use crate::lexer::LexemeKind;
-use crate::visitor::Visitor;
+use crate::visitor::{Visitor, RuntimeError};
 
 #[derive(Debug, PartialEq)]
-pub enum Expr {
+pub enum Expr<T> {
     Binary {
-        left: Box<Expr>,
+        left: Box<Expr<T>>,
         operator: LexemeKind,
-        right: Box<Expr>,
+        right: Box<Expr<T>>,
     },
-    Literal(Value),
+    Literal(Value<T>),
     Unary {
         operator: LexemeKind,
-        right: Box<Expr>,
+        right: Box<Expr<T>>,
     },
-    Grouping(Box<Expr>),
+    Grouping(Box<Expr<T>>),
     Error,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Value {
-    BOOLEAN(bool),
-    STRING(String),
-    NUMBER(f64),
+pub struct Value<T>(pub T);
+
+impl<T> fmt::Display for Value<T>
+where T: fmt::Display + fmt::Debug
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
 }
 
-impl Expr {
-    pub(crate) fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
+impl<T> Deref for Value<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T> Expr<T> {
+    pub(crate) fn accept(&self, visitor: &mut dyn Visitor<T>) -> Result<T, RuntimeError> {
         match *self {
             Expr::Binary { operator, left, right } => {
                 visitor.visit_binary(*left, operator, *right)
@@ -63,12 +77,7 @@ impl Expr {
                 st
             },
             Expr::Literal(v) => {
-                match v {
-                    Value::BOOLEAN(true) => "true".to_string(),
-                    Value::BOOLEAN(false) => "true".to_string(),
-                    Value::STRING(st) => st.to_string(),
-                    Value::NUMBER(n) => n.to_string(),
-                }
+                (*v).to_string()
             }
             Expr::Unary { operator, right } => {
                 let mut st = String::new();
