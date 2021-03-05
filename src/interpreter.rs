@@ -57,13 +57,13 @@ impl Visitor<InterpreterResult> for Interpreter {
             LexemeKind::Plus => Ok(Value::NUMBER(num)),
             _ => Err(RuntimeError {
                 line: 0,
-                message: "Not the right op code".to_string(),
+                message: "Can only prefix a number with + or -".to_string(),
             })
         }
     }
 
     fn visit_grouping(&mut self, expr: &Expr) -> InterpreterResult {
-        // Ok(expr.accept(&mut self))
+        // Ok(expr.accept(self))
         self.evaluate(expr)
     }
 
@@ -98,6 +98,22 @@ mod tests {
         let res = Interpreter.evaluate(&ast);
         assert_eq!(res.unwrap(), Value::NUMBER(-1.0));
     }
+
+    #[test]
+    fn it_adds() {
+        let tokens = Scanner::new("-1+1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        let res = Interpreter.evaluate(&ast);
+        assert_eq!(res.unwrap(), Value::NUMBER(0.0));
+    }
+
+    // #[test]
+    // fn it_unary_works() {
+    //     let tokens = Scanner::new("-1".to_owned()).collect();
+    //     let ast = Parser::new(tokens).parse().unwrap();
+    //     let res = Interpreter.evaluate(&ast);
+    //     assert_eq!(res.unwrap(), Value::NUMBER(-1.0));
+    // }
 
     #[test]
     fn it_errors() {

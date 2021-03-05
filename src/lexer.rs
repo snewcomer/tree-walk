@@ -9,13 +9,14 @@ pub enum LexemeKind {
     RightParen,
     LeftBrace,
     RightBrace,
-    COMMA,
-    DOT,
+    Comma,
+    Dot,
     Minus,
     Plus,
     Semicolon,
     Slash,
     Star,
+    Whitespace,
 
     // One or two character tokens.
     Bang,
@@ -62,8 +63,8 @@ impl LexemeKind {
             Self::RightParen => ")".to_owned(),
             Self::LeftBrace => "{".to_owned(),
             Self::RightBrace => "}".to_owned(),
-            Self::COMMA => ".".to_owned(),
-            Self::DOT => ".".to_owned(),
+            Self::Comma => ".".to_owned(),
+            Self::Dot => ".".to_owned(),
             Self::Minus => "-".to_owned(),
             Self::Plus => "+".to_owned(),
             Self::Semicolon => ";".to_owned(),
@@ -77,6 +78,7 @@ impl LexemeKind {
             Self::GreaterEqual => ">=".to_owned(),
             Self::Less => "<".to_owned(),
             Self::LessEqual => "<=".to_owned(),
+            Self::Whitespace => " ".to_owned(),
             Self::IDENTIFIER(i) => i.to_owned(),
             Self::STRING(s) => format!("\"{}\"", s),
             Self::NUMBER(n) => n.to_string(),
@@ -241,8 +243,8 @@ impl Iterator for Scanner {
             '(' => Some(Token::new(LexemeKind::LeftParen, self.line)),
             '{' => Some(Token::new(LexemeKind::LeftBrace, self.line)),
             '}' => Some(Token::new(LexemeKind::RightBrace, self.line)),
-            ',' => Some(Token::new(LexemeKind::COMMA, self.line)),
-            '.' => Some(Token::new(LexemeKind::DOT, self.line)),
+            ',' => Some(Token::new(LexemeKind::Comma, self.line)),
+            '.' => Some(Token::new(LexemeKind::Dot, self.line)),
             '-' => Some(Token::new(LexemeKind::Minus, self.line)),
             '+' => Some(Token::new(LexemeKind::Plus, self.line)),
             ';' => Some(Token::new(LexemeKind::Semicolon, self.line)),
@@ -325,12 +327,11 @@ impl Iterator for Scanner {
                 }
             }
             c if c.is_whitespace() => {
+                // eat whitepsace so it doesnt show up Token
                 if c == '\n' {
                     self.line += 1;
                 }
-                self.cursor += 1;
-                // TODO fix.  This causes a skip if whitespace in the middle
-                self.next()
+                Some(Token::new(LexemeKind::Whitespace, self.line))
             }
             '"' => {
                 let word = self.word_boundary();
@@ -370,6 +371,7 @@ mod tests {
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LeftParen, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::BangEqual, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RightParen, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EqualEqual, 0));
         assert_eq!(sc.next(), None);
     }
@@ -377,7 +379,7 @@ mod tests {
     #[test]
     fn it_works_collect() {
         let tokens: Vec<Token> = Scanner::new("(!=) ==".to_owned()).collect();
-        assert_eq!(tokens.len(), 4);
+        assert_eq!(tokens.len(), 5);
     }
 
     #[test]
@@ -385,6 +387,7 @@ mod tests {
         let mut sc = Scanner::new("{} // foo".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LeftBrace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RightBrace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next(), None);
     }
 
@@ -393,6 +396,7 @@ mod tests {
         let mut sc = Scanner::new("{} //".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LeftBrace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RightBrace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next(), None);
     }
 
@@ -400,10 +404,14 @@ mod tests {
     fn it_handles_comparisons() {
         let mut sc = Scanner::new(">= <= != () ==".to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::GreaterEqual, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LessEqual, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::BangEqual, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LeftParen, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RightParen, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::EqualEqual, 0));
         assert_eq!(sc.next(), None);
     }
@@ -415,6 +423,7 @@ mod tests {
             sc.next().unwrap(),
             Token::new(LexemeKind::STRING("bar".to_string()), 0)
         );
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next(), None);
     }
 
@@ -425,11 +434,14 @@ mod tests {
             sc.next().unwrap(),
             Token::new(LexemeKind::STRING("foo".to_string()), 0)
         );
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Equal, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(
             sc.next().unwrap(),
             Token::new(LexemeKind::STRING("bar".to_string()), 0)
         );
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
         assert_eq!(sc.next(), None);
     }
 
@@ -487,12 +499,17 @@ and while
 andd
 ";
         let mut sc = Scanner::new(source.to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 1));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::AND, 1));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 1));
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::WHILE, 1));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 2));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 3));
         assert_eq!(
             sc.next().unwrap(),
             Token::new(LexemeKind::IDENTIFIER("andd".to_string()), 3)
         );
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 4));
         assert_eq!(sc.next(), None);
     }
 

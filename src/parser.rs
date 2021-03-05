@@ -8,7 +8,7 @@ pub(crate) struct Parser {
     cursor: usize,
 }
 
-pub(crate) fn debug_tree(ast: Expr) -> String {
+pub(crate) fn debug_tree(ast: &Expr) -> String {
     let mut st = String::new();
     st.push_str("(");
     if let Expr::Binary {
@@ -59,6 +59,11 @@ impl Parser {
             .and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
     }
 
+    fn peek_next(&self) -> Option<LexemeKind> {
+        self.tokens.get(self.cursor + 1)
+            .and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
+    }
+
     fn expect(&mut self, kind: LexemeKind) {
         if self.at(kind) {
             self.cursor += 1;
@@ -72,6 +77,12 @@ impl Parser {
             return false;
         };
         self.peek_kind() == Some(kind)
+    }
+
+    fn eat_whitespace(&mut self) {
+        if self.peek_kind() == Some(LexemeKind::Whitespace) {
+            self.cursor += 1;
+        }
     }
 
     fn error(&self) -> Option<Expr> {
@@ -90,6 +101,8 @@ impl Parser {
     fn equality(&mut self) -> Option<Expr> {
         let mut expr = self.comparison();
 
+        self.eat_whitespace();
+
         while self.is_equal(vec![LexemeKind::BangEqual, LexemeKind::EqualEqual]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
@@ -106,6 +119,8 @@ impl Parser {
 
     fn comparison(&mut self) -> Option<Expr> {
         let mut expr = self.term();
+
+        self.eat_whitespace();
 
         while self.is_equal(vec![
             LexemeKind::Greater,
@@ -131,6 +146,8 @@ impl Parser {
     fn term(&mut self) -> Option<Expr> {
         let mut expr = self.factor();
 
+        self.eat_whitespace();
+
         while self.is_equal(vec![LexemeKind::Minus, LexemeKind::Plus]) {
             let operator = self.peek_kind().unwrap();
 
@@ -150,6 +167,8 @@ impl Parser {
     fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
 
+        self.eat_whitespace();
+
         while self.is_equal(vec![LexemeKind::Slash, LexemeKind::Star]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
@@ -166,6 +185,9 @@ impl Parser {
 
     fn unary(&mut self) -> Option<Expr> {
         let mut res = None;
+
+        self.eat_whitespace();
+
         while self.is_equal(vec![LexemeKind::Bang, LexemeKind::Minus]) {
             let operator = self.peek_kind().unwrap();
             self.cursor += 1;
@@ -248,7 +270,7 @@ mod test {
     }
 
     #[test]
-    fn xssfdit_handles_co() {
+    fn it_handles_co() {
         let tokens = Scanner::new("1 >= 2".to_owned()).collect();
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
@@ -284,15 +306,15 @@ mod test {
             }
         );
 
-        // let tokens = Scanner::new("+1".to_owned()).collect();
-        // let ast = Parser::new(tokens).parse().unwrap();
-        // assert_eq!(
-        //     ast,
-        //     Expr::Unary {
-        //         operator: LexemeKind::Minus,
-        //         right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
-        //     }
-        // );
+        let tokens = Scanner::new("+1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        assert_eq!(
+            ast,
+            Expr::Unary {
+                operator: LexemeKind::Minus,
+                right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
+            }
+        );
     }
 
     #[test]
