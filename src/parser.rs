@@ -59,11 +59,6 @@ impl Parser {
             .and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
     }
 
-    fn peek_next(&self) -> Option<LexemeKind> {
-        self.tokens.get(self.cursor + 1)
-            .and_then(|Token { lexeme, .. }| Some(lexeme.clone()))
-    }
-
     fn expect(&mut self, kind: LexemeKind) {
         if self.at(kind) {
             self.cursor += 1;
@@ -188,14 +183,27 @@ impl Parser {
 
         self.eat_whitespace();
 
-        while self.is_equal(vec![LexemeKind::Bang, LexemeKind::Minus]) {
+        while self.is_equal(vec![LexemeKind::Bang, LexemeKind::Minus, LexemeKind::Plus]) {
             let operator = self.peek_kind().unwrap();
+
             self.cursor += 1;
-            let right = self.unary();
-            res = Some(Expr::Unary {
-                operator,
-                right: Box::new(right.unwrap()),
-            })
+
+            let new = self.unary();
+            match res {
+                Some(Expr::Unary { operator, right }) => {
+                    res = Some(Expr::Binary {
+                        left: right,
+                        operator: operator.clone(),
+                        right: Box::new(new.unwrap()),
+                    });
+                },
+                _ => {
+                    res = Some(Expr::Unary {
+                        operator,
+                        right: Box::new(new.unwrap()),
+                    });
+                }
+            }
         }
 
         if res.is_some() {
@@ -311,7 +319,7 @@ mod test {
         assert_eq!(
             ast,
             Expr::Unary {
-                operator: LexemeKind::Minus,
+                operator: LexemeKind::Plus,
                 right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             }
         );
@@ -354,17 +362,13 @@ mod test {
     }
 
     #[test]
-    fn it_errors() {
+    fn it_works_plus_plus() {
         let tokens = Scanner::new("+1+1".to_owned()).collect();
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
             Expr::Binary {
-                left: Box::new(Expr::Binary {
-                    left: Box::new(Expr::Error),
-                    operator: LexemeKind::Plus,
-                    right: Box::new(Expr::Literal(Value::NUMBER(1.0)))
-                }),
+                left: Box::new(Expr::Literal(Value::NUMBER(1.0))),
                 operator: LexemeKind::Plus,
                 right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             }
