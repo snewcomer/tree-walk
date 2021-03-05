@@ -14,9 +14,14 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Grouping(Box<Expr>),
-    Error,
+    Error {
+        line: usize,
+        message: String,
+    }
 }
 
+// a single element tuple struct over a generic type will not work.
+// arms in parser will return different types for T
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     BOOLEAN(bool),
@@ -39,8 +44,8 @@ impl Expr {
             Expr::Literal(v) => {
                 visitor.visit_literal(v)
             }
-            Expr::Error => {
-                visitor.visit_error()
+            Expr::Error { line, message } => {
+                visitor.visit_error(line, message)
             }
         }
     }
@@ -55,11 +60,11 @@ impl Expr {
                 st.push_str(&op);
                 st.push_str(" ");
 
-                let l = &(*left).debug();
+                let l = &left.debug();
                 st.push_str(l);
                 st.push_str(" ");
 
-                let r = &(*right).debug();
+                let r = &right.debug();
                 st.push_str(r);
 
                 st
@@ -80,7 +85,7 @@ impl Expr {
                 st.push_str(&op);
                 st.push_str(" ");
 
-                let r = &(*right).debug();
+                let r = &right.debug();
                 st.push_str(r);
                 st.push_str(" ");
 
@@ -89,7 +94,7 @@ impl Expr {
             Expr::Grouping(value) => {
                 value.debug()
             },
-            Expr::Error => "~ERROR~".to_string(),
+            Expr::Error { message, .. } => message.to_string()
         }
     }
 }

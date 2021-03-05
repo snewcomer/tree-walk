@@ -51,14 +51,14 @@ pub enum LexemeKind {
     VAR,
     WHILE,
 
-    UNEXPECTED,
+    UNEXPECTED(String),
 
     EOF,
 }
 
 impl LexemeKind {
     pub fn to_string(&self) -> String {
-        match &self {
+        match self {
             Self::LeftParen => "(".to_owned(),
             Self::RightParen => ")".to_owned(),
             Self::LeftBrace => "{".to_owned(),
@@ -99,7 +99,7 @@ impl LexemeKind {
             Self::VAR => "var".to_owned(),
             Self::WHILE => "while".to_owned(),
             Self::EOF => "<EOF>".to_owned(),
-            Self::UNEXPECTED => "~UNEXPECTED~".to_owned(),
+            Self::UNEXPECTED(st) => st.clone(),
         }
     }
 }
@@ -112,7 +112,7 @@ impl fmt::Display for LexemeKind {
 
 #[derive(Debug, PartialEq)]
 pub struct Token {
-    line: usize,
+    pub line: usize,
     pub lexeme: LexemeKind,
 }
 
@@ -341,8 +341,7 @@ impl Iterator for Scanner {
                 if self.is_finished() {
                     Some(Token::new(LexemeKind::EOF, self.line))
                 } else {
-                    // TODO: how to handle errors.  Should this only happen in the parse phase?
-                    Some(Token::new(LexemeKind::UNEXPECTED, self.line))
+                    Some(Token::new(LexemeKind::UNEXPECTED(c.to_string()), self.line))
                 }
             }
         };
@@ -518,7 +517,7 @@ andd
         let source = "/·";
         let mut sc = Scanner::new(source.to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Slash, 0));
-        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::UNEXPECTED, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::UNEXPECTED("·".to_string()), 0));
         assert_eq!(sc.next(), None);
     }
 }

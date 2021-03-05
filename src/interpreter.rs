@@ -1,12 +1,16 @@
-use std::error;
 use std::fmt;
 use crate::parser::{Expr, Value};
 use crate::lexer::LexemeKind;
 use crate::visitor::Visitor;
 
+// Error strategy
+// Lexer - captures all tokens. UNEXPECTED(String) enum variant for unknown
+// Parser - add Expr::Error { line, message } if come across something that is unexpected. No build
+// compile time error thrown.  Baked into return type
+// Interpreter - RuntimeError when iterating over ast provided by Parser
 #[derive(Debug, PartialEq)]
 pub struct RuntimeError {
-    line: u64,
+    line: usize,
     message: String,
 }
 
@@ -15,8 +19,6 @@ impl fmt::Display for RuntimeError {
         write!(f, "{} [line: {}]", self.message, self.line)
     }
 }
-
-impl error::Error for RuntimeError {}
 
 type InterpreterResult = Result<Value, RuntimeError>;
 
@@ -67,10 +69,10 @@ impl Visitor<InterpreterResult> for Interpreter {
         self.evaluate(expr)
     }
 
-    fn visit_error(&mut self) -> InterpreterResult {
+    fn visit_error(&mut self, line: &usize, message: &str) -> InterpreterResult {
         Err(RuntimeError {
-            line: 0,
-            message: "General Error".to_string(),
+            line: *line,
+            message: message.to_string(),
         })
     }
 }
@@ -107,19 +109,35 @@ mod tests {
         assert_eq!(res.unwrap(), Value::NUMBER(0.0));
     }
 
-    // #[test]
-    // fn it_unary_works() {
-    //     let tokens = Scanner::new("-1".to_owned()).collect();
-    //     let ast = Parser::new(tokens).parse().unwrap();
-    //     let res = Interpreter.evaluate(&ast);
-    //     assert_eq!(res.unwrap(), Value::NUMBER(-1.0));
-    // }
+    #[test]
+    fn it_unary_works() {
+        let tokens = Scanner::new("+1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        let res = Interpreter.evaluate(&ast);
+        assert_eq!(res.unwrap(), Value::NUMBER(1.0));
+    }
 
     #[test]
     fn it_errors() {
         let tokens = Scanner::new("()".to_owned()).collect();
         let ast = Parser::new(tokens).parse().unwrap();
         let res = Interpreter.evaluate(&ast);
-        assert_eq!(res, Err(RuntimeError { line: 0, message: "General Error".to_string() }));
+        assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at RightParen".to_string() }));
+    }
+
+    #[test]
+    fn it_errors_not_number() {
+        let tokens = Scanner::new("*1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        let res = Interpreter.evaluate(&ast);
+        assert_eq!(res, Err(RuntimeError { line: 0, message: "Not a number".to_string() }));
+    }
+
+    #[test]
+    fn it_errors_invalid_operator() {
+        let tokens = Scanner::new("1&1".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().unwrap();
+        let res = Interpreter.evaluate(&ast);
+        assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at &".to_string() }));
     }
 }

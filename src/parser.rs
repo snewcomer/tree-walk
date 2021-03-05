@@ -78,8 +78,8 @@ impl Parser {
         }
     }
 
-    fn error(&self) -> Option<Expr> {
-        Some(Expr::Error)
+    fn error(&self, line: usize, msg: &str) -> Option<Expr> {
+        Some(Expr::Error { line, message: msg.to_string() })
     }
 
     fn is_equal(&self, kinds: Vec<LexemeKind>) -> bool {
@@ -207,7 +207,13 @@ impl Parser {
         if res.is_some() {
             res
         } else {
-            self.primary()
+            let res = self.primary();
+            let token = self.peek();
+            if let Some(Token { lexeme: LexemeKind::UNEXPECTED(l), line }) = token {
+                self.error(*line, &format!("Parsing error at {}", l))
+            } else {
+                res
+            }
         }
     }
 
@@ -240,7 +246,7 @@ impl Parser {
                     Box::new(expr.unwrap()),
                 ))
             }
-            _ => self.error(),
+            m => self.error(token.line, &format!("Parsing error at {}", m)),
         }
     }
 }
@@ -329,7 +335,7 @@ mod test {
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
-            Expr::Error
+            Expr::Error { line: 0, message: "Parsing error at AND".to_string() }
         );
     }
 
@@ -339,7 +345,7 @@ mod test {
         let ast = Parser::new(tokens).parse().unwrap();
         assert_eq!(
             ast,
-            Expr::Error
+            Expr::Error { line: 0, message: "Parsing error at IDENTIFIER(\"a\")".to_string() }
         );
     }
 
