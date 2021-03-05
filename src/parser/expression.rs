@@ -26,7 +26,7 @@ pub enum Value {
 
 impl Expr {
     pub(crate) fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
-        match &*self {
+        match self {
             Expr::Binary { operator, ref left, ref right } => {
                 visitor.visit_binary(left, operator, right)
             }
@@ -46,7 +46,7 @@ impl Expr {
     }
 
     pub(crate) fn debug(&self) -> String {
-        match &self {
+        match self {
             Expr::Binary { operator, left, right } => {
                 let mut st = String::new();
                 st.push_str("(");

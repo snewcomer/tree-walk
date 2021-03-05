@@ -40,8 +40,6 @@ impl Parser {
         Self { tokens, cursor: 0 }
     }
 
-    // TODO: Do we need to return Options up the chain?  Did this to take advantage of ! error
-    // handling but not exactly sure of my strategy
     pub(crate) fn parse(&mut self) -> Option<Expr> {
         self.expression()
     }
