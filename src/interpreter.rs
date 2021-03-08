@@ -1,5 +1,6 @@
 use std::fmt;
-use crate::parser::{Expr, Value};
+use std::collections::HashMap;
+use crate::parser::{Expr, Stmt, Value};
 use crate::lexer::LexemeKind;
 use crate::visitor::Visitor;
 
@@ -25,6 +26,31 @@ type InterpreterResult = Result<Value, RuntimeError>;
 pub struct Interpreter;
 
 impl Interpreter {
+    pub fn start(&mut self, ast: &Stmt) -> InterpreterResult {
+        let mut variables = HashMap::new();
+
+        // TODO: make a loop
+        match &ast {
+            Stmt::Expr(expr) => self.evaluate(expr),
+            Stmt::Print(st) => Ok(Value::STRING(st.to_string())),
+            Stmt::VariableDef { ident, expr } => {
+                if let Some(expr) = expr {
+                    // var a = expr;
+                    let res = self.evaluate(expr);
+                    variables.insert(ident, res);
+                } else {
+                    // var a;
+                    variables.insert(ident, Ok(Value::Null));
+                }
+
+                Ok(Value::STRING(format!("var: {}", ident)))
+            }
+            Stmt::Error { line, message } => {
+                Err(RuntimeError { line: *line, message: message.clone() })
+            }
+        }
+    }
+
     pub fn evaluate(&mut self, expr: &Expr) -> InterpreterResult {
         expr.accept(self)
     }
@@ -96,48 +122,89 @@ mod tests {
     #[test]
     fn it_works() {
         let tokens = Scanner::new("-1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().unwrap();
-        let res = Interpreter.evaluate(&ast);
-        assert_eq!(res.unwrap(), Value::NUMBER(-1.0));
+        let mut stmts = Parser::new(tokens).parse().into_iter();
+        while let Some(stmt) = stmts.next() {
+            let res = Interpreter.start(&stmt.unwrap());
+            assert_eq!(res.unwrap(), Value::NUMBER(-1.0));
+        }
     }
 
     #[test]
     fn it_adds() {
         let tokens = Scanner::new("-1+1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().unwrap();
-        let res = Interpreter.evaluate(&ast);
-        assert_eq!(res.unwrap(), Value::NUMBER(0.0));
+        let mut stmts = Parser::new(tokens).parse().into_iter();
+        while let Some(stmt) = stmts.next() {
+            let res = Interpreter.start(&stmt.unwrap());
+            assert_eq!(res.unwrap(), Value::NUMBER(0.0));
+        }
     }
 
     #[test]
     fn it_unary_works() {
         let tokens = Scanner::new("+1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().unwrap();
-        let res = Interpreter.evaluate(&ast);
-        assert_eq!(res.unwrap(), Value::NUMBER(1.0));
+        let mut stmts = Parser::new(tokens).parse().into_iter();
+        while let Some(stmt) = stmts.next() {
+            let res = Interpreter.start(&stmt.unwrap());
+            assert_eq!(res.unwrap(), Value::NUMBER(1.0));
+        }
     }
 
     #[test]
     fn it_errors() {
         let tokens = Scanner::new("()".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().unwrap();
-        let res = Interpreter.evaluate(&ast);
-        assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at RightParen".to_string() }));
+        let stmts = Parser::new(tokens).parse();
+        let res = Interpreter.start(&stmts[0].as_ref().unwrap());
+        assert_eq!(res, Ok(Value::STRING("".to_string())));
     }
 
     #[test]
     fn it_errors_not_number() {
         let tokens = Scanner::new("*1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().unwrap();
-        let res = Interpreter.evaluate(&ast);
-        assert_eq!(res, Err(RuntimeError { line: 0, message: "Not a number".to_string() }));
+        let stmts = Parser::new(tokens).parse();
+        let res = Interpreter.start(&stmts[0].as_ref().unwrap());
+        assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at Star".to_string() }));
+        let res = Interpreter.start(&stmts[1].as_ref().unwrap());
+        assert_eq!(res, Ok(Value::NUMBER(1.0)));
     }
 
     #[test]
     fn it_errors_invalid_operator() {
         let tokens = Scanner::new("1&1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().unwrap();
-        let res = Interpreter.evaluate(&ast);
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
         assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at &".to_string() }));
+    }
+
+    #[test]
+    fn it_works_stmts() {
+        let tokens = Scanner::new("print(\"foo\")".to_owned()).collect();
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
+        assert_eq!(res, Ok(Value::STRING("foo".to_string())));
+
+        let tokens = Scanner::new("print(2)".to_owned()).collect();
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
+        assert_eq!(res, Ok(Value::STRING("2".to_string())));
+
+        let tokens = Scanner::new("print(2+1)".to_owned()).collect();
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
+        assert_eq!(res, Ok(Value::STRING("3".to_string())));
+
+        let tokens = Scanner::new("print()".to_owned()).collect();
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
+        assert_eq!(res, Ok(Value::STRING("".to_string())));
+
+        let tokens = Scanner::new("var a;".to_owned()).collect();
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
+        assert_eq!(res, Ok(Value::STRING("var: a".to_string())));
+
+        let tokens = Scanner::new("var a = \"foo\";".to_owned()).collect();
+        let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        let res = Interpreter.start(&stmt.unwrap());
+        assert_eq!(res, Ok(Value::STRING("var: a".to_string())));
     }
 }

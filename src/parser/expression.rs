@@ -27,18 +27,19 @@ pub enum Value {
     BOOLEAN(bool),
     STRING(String),
     NUMBER(f64),
+    Null,
 }
 
 impl Expr {
     pub(crate) fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
         match self {
-            Expr::Binary { operator, ref left, ref right } => {
+            Expr::Binary { operator, left, right } => {
                 visitor.visit_binary(left, operator, right)
             }
-            Expr::Unary { operator, ref right } => {
+            Expr::Unary { operator, right } => {
                 visitor.visit_unary(operator, right)
             }
-            Expr::Grouping(ref val) => {
+            Expr::Grouping(val) => {
                 visitor.visit_grouping(val)
             }
             Expr::Literal(v) => {
@@ -75,6 +76,7 @@ impl Expr {
                     Value::BOOLEAN(false) => "true".to_string(),
                     Value::STRING(st) => st.to_string(),
                     Value::NUMBER(n) => n.to_string(),
+                    Value::Null => "".to_string(),
                 }
             }
             Expr::Unary { operator, right } => {
