@@ -44,11 +44,14 @@ impl Parser {
     }
 
     // ultimately, we execute a list of statements
-    pub(crate) fn parse(&mut self) -> Vec<Option<Stmt>> {
+    pub(crate) fn parse(&mut self) -> Vec<Stmt> {
         let mut stmts = Vec::new();
         while !self.at_end() {
             let res = statement::parse(self);
-            stmts.push(res);
+
+            self.eat_whitespace();
+
+            stmts.push(res.unwrap());
         }
 
         stmts
@@ -92,7 +95,7 @@ impl Parser {
     }
 
     fn eat_whitespace(&mut self) {
-        if self.peek_kind() == Some(LexemeKind::Whitespace) {
+        while let Some(LexemeKind::Whitespace) = self.peek_kind() {
             self.cursor += 1;
         }
     }
@@ -107,7 +110,30 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Option<Expr> {
-        self.equality()
+        // self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Option<Expr> {
+        let mut expr = self.equality();
+
+        self.eat_whitespace();
+
+        while self.is_equal(vec![LexemeKind::Equal]) {
+            self.cursor += 1; // EQUAL
+
+            self.eat_whitespace();
+
+            if let Some(Expr::Variable(st)) = expr {
+                let right = self.assignment();
+                expr = Some(Expr::Assign {
+                    name: st,
+                    expr: Box::new(right.unwrap()),
+                });
+            }
+        }
+
+        expr
     }
 
     fn equality(&mut self) -> Option<Expr> {
@@ -261,6 +287,11 @@ impl Parser {
                 self.cursor += 1;
                 Some(Expr::Literal(Value::NUMBER(*num)))
             }
+            LexemeKind::IDENTIFIER(st) => {
+                self.cursor += 1;
+                // this will be used by the fn assignment
+                Some(Expr::Variable(st.to_string()))
+            }
             LexemeKind::LeftParen => {
                 self.cursor += 1;
 
@@ -277,7 +308,7 @@ impl Parser {
                     None => {
                         // fail gracefully if we haven't closed out the RightParen
                         let last_token = self.last_token().unwrap();
-                        self.error(last_token.line, &format!("Parsing error at {}", last_token.lexeme))
+                        self.error(last_token.line, &format!("~~Parsing error at {}", last_token.lexeme))
                     }
                     ex => Some(Expr::Grouping(
                         Box::new(ex.unwrap())
@@ -300,7 +331,7 @@ mod test {
     #[test]
     fn it_handles_binary() {
         let tokens = Scanner::new("1+1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Binary {
@@ -311,7 +342,7 @@ mod test {
         );
 
         let tokens = Scanner::new("1 == 1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Binary {
@@ -325,7 +356,7 @@ mod test {
     #[test]
     fn it_handles_co() {
         let tokens = Scanner::new("1 >= 2".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Binary {
@@ -336,7 +367,7 @@ mod test {
         );
 
         let tokens = Scanner::new("1 <= 2".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Binary {
@@ -350,7 +381,7 @@ mod test {
     #[test]
     fn it_handles_unary() {
         let tokens = Scanner::new("-1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Unary {
@@ -360,7 +391,7 @@ mod test {
         );
 
         let tokens = Scanner::new("+1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Unary {
@@ -373,7 +404,7 @@ mod test {
     #[test]
     fn it_errors_keyword() {
         let tokens = Scanner::new("and".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Error { line: 0, message: "Parsing error at AND".to_string() })
@@ -383,17 +414,17 @@ mod test {
     #[test]
     fn not_expression() {
         let tokens = Scanner::new("a".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
-            Stmt::Expr(Expr::Error { line: 0, message: "Parsing error at IDENTIFIER(\"a\")".to_string() })
+            Stmt::Expr(Expr::Variable("a".to_string()))
         );
     }
 
     #[test]
     fn it_works_parenthesized_expression() {
         let tokens = Scanner::new("(1+1)".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Grouping(
@@ -409,7 +440,7 @@ mod test {
     #[test]
     fn it_works_plus_plus() {
         let tokens = Scanner::new("+1+1".to_owned()).collect();
-        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap().unwrap();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
         assert_eq!(
             ast,
             Stmt::Expr(Expr::Binary {

@@ -1,14 +1,20 @@
-use crate::lexer::LexemeKind;
-use crate::visitor::Visitor;
+use std::fmt;
+use crate::lexer::{LexemeKind, Token};
+use crate::visitor::ExpressionVisitor;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
+    Assign {
+        name: String,
+        expr: Box<Expr>,
+    },
     Binary {
         left: Box<Expr>,
         operator: LexemeKind,
         right: Box<Expr>,
     },
     Literal(Value),
+    Variable(String),
     Unary {
         operator: LexemeKind,
         right: Box<Expr>,
@@ -30,9 +36,29 @@ pub enum Value {
     Null,
 }
 
-impl Expr {
-    pub(crate) fn accept<T>(&self, visitor: &mut dyn Visitor<T>) -> T {
+impl Value {
+    pub fn to_string(&self) -> String {
         match self {
+            Self::BOOLEAN(b) => b.to_string(),
+            Self::NUMBER(n) => n.to_string(),
+            Self::STRING(ref s) => format!("\"{}\"", s),
+            Self::Null => "nil".to_owned(),
+        }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl Expr {
+    pub(crate) fn accept<T>(&self, visitor: &mut dyn ExpressionVisitor<T>) -> T {
+        match self {
+            Expr::Assign { name, expr } => {
+                visitor.visit_assign(name, expr)
+            }
             Expr::Binary { operator, left, right } => {
                 visitor.visit_binary(left, operator, right)
             }
@@ -45,6 +71,9 @@ impl Expr {
             Expr::Literal(v) => {
                 visitor.visit_literal(v)
             }
+            Expr::Variable(v) => {
+                visitor.visit_variable(v)
+            }
             Expr::Error { line, message } => {
                 visitor.visit_error(line, message)
             }
@@ -53,6 +82,20 @@ impl Expr {
 
     pub(crate) fn debug(&self) -> String {
         match self {
+            Expr::Assign { name, expr} => {
+                let mut st = String::new();
+                st.push_str("(");
+
+                let op = name.to_string();
+                st.push_str(&op);
+                st.push_str(" ");
+
+                let l = &expr.debug();
+                st.push_str(l);
+                st.push_str(" ");
+
+                st
+            },
             Expr::Binary { operator, left, right } => {
                 let mut st = String::new();
                 st.push_str("(");
@@ -95,6 +138,9 @@ impl Expr {
             },
             Expr::Grouping(value) => {
                 value.debug()
+            },
+            Expr::Variable(st) => {
+                st.to_string()
             },
             Expr::Error { message, .. } => message.to_string()
         }

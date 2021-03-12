@@ -531,6 +531,14 @@ andd
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RightParen, 0));
         assert_eq!(sc.next(), None);
 
+        let source = "print(1)";
+        let mut sc = Scanner::new(source.to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::PRINT, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::LeftParen, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::NUMBER(1.0), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RightParen, 0));
+        assert_eq!(sc.next(), None);
+
         let source = "var foo";
         let mut sc = Scanner::new(source.to_owned());
         assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::VAR, 0));

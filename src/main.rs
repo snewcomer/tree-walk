@@ -55,20 +55,22 @@ fn run(source: String) -> TWResult<()> {
     let tokens = Scanner::new(source).collect();
 
     let mut parser = Parser::new(tokens); // vec![token1, token2]
-    let mut stmts = parser.parse().into_iter();
-    while let Some(stmt) = stmts.next() {
-        match stmt {
-            Some(stmt) => {
-                println!("{:?}", parser::debug_tree(&stmt));
+    let stmts = parser.parse();
+    let res = Interpreter.start(stmts);
+    eprintln!("{}", res.unwrap());
+    // while let Some(stmt) = stmts.next() {
+    //     match stmt {
+    //         Some(stmt) => {
+    //             println!("{:?}", parser::debug_tree(&stmt));
 
-                let result = Interpreter.start(&stmt);
+    //             let result = Interpreter.start(&stmt);
 
-                eprintln!("{:?}", result.unwrap());
-            },
-            None => eprintln!("{}", "Not a valid Lox statement")
-        }
+    //             eprintln!("{:?}", result.unwrap());
+    //         },
+    //         None => eprintln!("{}", "Not a valid Lox statement")
+    //     }
 
-    }
+    // }
 
     Ok(())
 }
