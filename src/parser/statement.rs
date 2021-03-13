@@ -65,21 +65,18 @@ fn declaration_stmt(p: &mut Parser) -> Option<Stmt> {
 
     match p.expression() {
         Some(Expr::Assign { name, expr }) => {
-            Some(Stmt::VariableDef { ident: name, expr: Some(*expr) })
+            let stmt = Some(Stmt::VariableDef { ident: name, expr: Some(*expr) });
+            // assert!(p.at(LexemeKind::Semicolon));
+            p.cursor += 1;
+            stmt
         }
         Some(Expr::Variable(name)) => {
-            Some(Stmt::VariableDef { ident: name, expr: None })
+            let stmt = Some(Stmt::VariableDef { ident: name, expr: None });
+            // assert!(p.at(LexemeKind::Semicolon));
+            p.cursor += 1;
+            stmt
         }
-        _ => None
-    }
-}
-
-fn variable_ref(p: &mut Parser) -> Option<String> {
-    match p.peek_kind() {
-        Some(LexemeKind::IDENTIFIER(st)) => {
-            Some(st)
-        },
-        _ => None
+        _ => Some(Stmt::Error { line: 0, message: "Unfinished right hand assignment".to_string() })
     }
 }
 
@@ -95,14 +92,18 @@ fn print_stmt(p: &mut Parser) -> Option<Stmt> {
         _ => {
             let expr = p.expression();
 
-            assert!(p.at(LexemeKind::RightParen));
-            p.cursor += 1; // RightParen
+            if let Ok(()) = p.expect(LexemeKind::RightParen) {
+                p.cursor += 1; // RightParen
 
-            if let Ok(_) = p.expect(LexemeKind::Semicolon) {
-               p.cursor += 1;
+                // semicolon optional
+                if let Ok(_) = p.expect(LexemeKind::Semicolon) {
+                   p.cursor += 1;
+                }
+
+                Some(Stmt::Print(expr))
+            } else {
+                Some(Stmt::Error { line: 0, message: "Unfinished print statement".to_string() })
             }
-
-            Some(Stmt::Print(expr))
         }
     }
 }
@@ -185,21 +186,21 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn it_errors() {
-    //     let tokens = Scanner::new("print".to_owned()).collect();
-    //     let mut p = Parser::new(tokens);
-    //     let res = parse(&mut p);
-    //     assert_eq!(res, Some(Stmt::Error { line: 0, message: "Unfinished print statement".to_string() }));
-    // }
+    #[test]
+    fn it_errors() {
+        let tokens = Scanner::new("print".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(res, Some(Stmt::Error { line: 0, message: "Unfinished print statement".to_string() }));
+    }
 
-    // #[test]
-    // fn it_doesnt_panick_unfinished() {
-    //     let tokens = Scanner::new("print(".to_owned()).collect();
-    //     let mut p = Parser::new(tokens);
-    //     let res = parse(&mut p);
-    //     assert_eq!(res, Some(Stmt::Error { line: 0, message: "Unfinished print statement".to_string() }));
-    // }
+    #[test]
+    fn it_doesnt_panick_unfinished() {
+        let tokens = Scanner::new("print(".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(res, Some(Stmt::Error { line: 0, message: "Unfinished print statement".to_string() }));
+    }
 
     #[test]
     fn it_works_partial_stmts() {
@@ -208,10 +209,10 @@ mod tests {
         let res = parse(&mut p);
         assert_eq!(res, Some(Stmt::VariableDef { ident: "a".to_string(), expr: None }));
 
-        // let tokens = Scanner::new("var  a;".to_owned()).collect();
-        // let mut p = Parser::new(tokens);
-        // let res = parse(&mut p);
-        // assert_eq!(res, Some(Stmt::VariableDef { ident: "a".to_string(), expr: None }));
+        let tokens = Scanner::new("var  a;".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(res, Some(Stmt::VariableDef { ident: "a".to_string(), expr: None }));
     }
 
     #[test]
@@ -240,5 +241,31 @@ mod tests {
                 })
             })
         );
+    }
+
+    #[test]
+    fn it_works_multiline() {
+        let tokens = Scanner::new("var a = 2;
+print(a);".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(res, Some(Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(2.0)))}));
+    }
+
+    #[test]
+    fn it_errors_expression_l_value() {
+        let tokens = Scanner::new("a + b = 2".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        // error in parser expr
+        assert_eq!(res, Some(Stmt::Expr(Expr::Error { line: 0, message: "Invalid left hand assignment expression".to_string() })));
+    }
+
+    #[test]
+    fn it_errors_stmt() {
+        let tokens = Scanner::new("var a =".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(res, Some(Stmt::Error { line: 0, message: "Unfinished right hand assignment".to_string() }));
     }
 }

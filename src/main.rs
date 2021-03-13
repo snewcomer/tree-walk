@@ -56,7 +56,8 @@ fn run(source: String) -> TWResult<()> {
 
     let mut parser = Parser::new(tokens); // vec![token1, token2]
     let stmts = parser.parse();
-    let res = Interpreter.start(stmts);
+    let mut interp = Interpreter::new();
+    let res = interp.start(stmts);
     eprintln!("{}", res.unwrap());
     // while let Some(stmt) = stmts.next() {
     //     match stmt {

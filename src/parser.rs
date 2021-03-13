@@ -125,11 +125,24 @@ impl Parser {
             self.eat_whitespace();
 
             if let Some(Expr::Variable(st)) = expr {
+                // this came from fn primary()
+                // recursive call in case a = b = 1;
                 let right = self.assignment();
-                expr = Some(Expr::Assign {
-                    name: st,
-                    expr: Box::new(right.unwrap()),
-                });
+                match right {
+                    Some(r) => {
+                        expr = Some(Expr::Assign {
+                            name: st,
+                            expr: Box::new(r),
+                        });
+                    }
+                    None => {
+                        let last_token = self.last_token().unwrap();
+                        expr = self.error(last_token.line, "Unfinished right hand assignment expression");
+                    }
+                }
+            } else {
+                let last_token = self.last_token().unwrap();
+                expr = self.error(last_token.line, "Invalid left hand assignment expression");
             }
         }
 
@@ -448,6 +461,26 @@ mod test {
                 operator: LexemeKind::Plus,
                 right: Box::new(Expr::Literal(Value::NUMBER(1.0))),
             })
+        );
+    }
+
+    #[test]
+    fn variables_semicolon() {
+        let tokens = Scanner::new("var a;".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        assert_eq!(
+            ast,
+            Stmt::VariableDef { ident: "a".to_string(), expr: None}
+        );
+    }
+
+    #[test]
+    fn variables_no_semicolon() {
+        let tokens = Scanner::new("var a".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        assert_eq!(
+            ast,
+            Stmt::VariableDef { ident: "a".to_string(), expr: None}
         );
     }
 }
