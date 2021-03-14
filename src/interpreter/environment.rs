@@ -5,15 +5,23 @@ use std::collections::HashMap;
 use crate::parser::Value;
 use super::RuntimeError;
 
+#[derive(Debug, PartialEq)]
 pub struct Environment {
     pub variables: collections::HashMap<String, Value>,
-    enclosing: Option<Rc<RefCell<Environment>>>, // pattern especially useful when a function will cannot borrow a field as mutable. Once something already has a reference, you can't then borrow as mutable
+    pub enclosing: Option<Rc<RefCell<Environment>>>, // pattern especially useful when a function will cannot borrow a field as mutable. Once something already has a reference, you can't then borrow as mutable
 }
 
 impl Environment {
     pub fn new() -> Self {
         Self {
             variables: HashMap::new(),
+            enclosing: None,
+        }
+    }
+
+    pub fn new_with_scope(env: &Environment) -> Self {
+        Self {
+            variables: env.variables.clone(),
             enclosing: None,
         }
     }
@@ -30,9 +38,12 @@ impl Environment {
                 return encl.borrow_mut().assign(name.clone(), value.clone());
             } else {
                 // if can never find, then error
+                // for key in self.variables.keys() {
+                //     eprintln!("{:?}", key);
+                // }
                 return Err(RuntimeError {
                     line: 0,
-                    message: format!("Variable {} does not exist", name),
+                    message: format!("Variable \"{}\" does not exist", name),
                 });
             }
         }
@@ -57,9 +68,12 @@ impl Environment {
                 }
             } else {
                 // if can never find, then error
+                // for key in self.variables.keys() {
+                //     eprintln!("{:?}", key);
+                // }
                 Err(RuntimeError {
                     line: 0,
-                    message: format!("Variable {} does not exist", name),
+                    message: format!("Variable \"{}\" does not exist", name),
                 })
             }
         }

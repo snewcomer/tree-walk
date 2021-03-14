@@ -31,7 +31,7 @@ pub(crate) fn debug_tree(ast: &Stmt) -> String {
         let r = &(*right).debug();
         st.push_str(r);
     } else {
-        println!("Not an expression");
+        // println!("Not an expression");
     }
 
     st.push_str(")");
@@ -134,6 +134,8 @@ impl Parser {
                             name: st,
                             expr: Box::new(r),
                         });
+
+                        let _ = self.expect(LexemeKind::Semicolon);
                     }
                     None => {
                         let last_token = self.last_token().unwrap();

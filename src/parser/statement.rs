@@ -5,6 +5,7 @@ use crate::visitor::StatementVisitor;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
+    Block(Box<Vec<Stmt>>),
     VariableDef {
         ident: String,
         expr: Option<Expr>,
@@ -20,6 +21,9 @@ pub enum Stmt {
 impl Stmt {
     pub(crate) fn accept<T>(&self, visitor: &mut dyn StatementVisitor<T>) -> T {
         match self {
+            Stmt::Block(stmts) => {
+                visitor.visit_block(stmts)
+            }
             Stmt::VariableDef { ident, expr } => {
                 visitor.visit_variable_def(ident, expr)
             }
@@ -37,13 +41,38 @@ impl Stmt {
 }
 
 pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
+    p.eat_whitespace();
+
     if p.at(LexemeKind::VAR) {
         p.cursor += 1;
         // ultimately, this is what our program is made up of
         declaration_stmt(p)
+    } else if p.at(LexemeKind::LeftBrace) {
+        p.cursor += 1;
+
+        block(p)
     } else {
         statement(p)
     }
+}
+
+fn block(p: &mut Parser) -> Option<Stmt> {
+    let mut v: Vec<Stmt> = vec![];
+
+    p.eat_whitespace();
+
+    while p.at(LexemeKind::RightBrace) == false {
+        let res = parse(p);
+        v.push(res.unwrap());
+
+        p.eat_whitespace();
+    }
+
+    p.eat_whitespace();
+
+    p.cursor += 1; // RightBrace
+
+    Some(Stmt::Block(Box::new(v)))
 }
 
 pub(crate) fn statement(p: &mut Parser) -> Option<Stmt> {
@@ -59,8 +88,6 @@ pub(crate) fn statement(p: &mut Parser) -> Option<Stmt> {
 
 fn declaration_stmt(p: &mut Parser) -> Option<Stmt> {
     // var x = 1+1;
-    p.cursor += 1; // var
-
     p.eat_whitespace();
 
     match p.expression() {
@@ -267,5 +294,47 @@ print(a);".to_owned()).collect();
         let mut p = Parser::new(tokens);
         let res = parse(&mut p);
         assert_eq!(res, Some(Stmt::Error { line: 0, message: "Unfinished right hand assignment".to_string() }));
+    }
+
+    #[test]
+    fn it_works_block_no_spaces() {
+        let tokens = Scanner::new("{var a = 2; print(a);}".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(
+                Stmt::Block(
+                    Box::new(
+                        vec![
+                            Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(2.0))) },
+                            Stmt::Print(Some(Expr::Variable("a".to_string()))),
+                        ]
+                    )
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn it_works_block_spaces() {
+        let tokens = Scanner::new("{
+            var a = 2;
+            print(a); }".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(
+                Stmt::Block(
+                    Box::new(
+                        vec![
+                            Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(2.0))) },
+                            Stmt::Print(Some(Expr::Variable("a".to_string()))),
+                        ]
+                    )
+                )
+            )
+        );
     }
 }

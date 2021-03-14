@@ -1,10 +1,9 @@
 mod environment;
 
 use std::fmt;
-// use std::collections::HashMap;
 use crate::parser::{Expr, Stmt, Value};
 use crate::lexer::LexemeKind;
-// use crate::parser;
+use crate::parser;
 use crate::visitor::{ExpressionVisitor, StatementVisitor};
 pub use environment::Environment;
 
@@ -45,7 +44,7 @@ impl Interpreter {
         let mut iter_stmts = stmts.into_iter();
 
         while let Some(stmt) = iter_stmts.next() {
-            // println!("{:?}", parser::debug_tree(&stmt));
+            println!("{:?}", parser::debug_tree(&stmt));
 
             // keep reassigning assuming the last one is an expression
             result = self.execute(&stmt);
@@ -136,6 +135,20 @@ fn unwrap_number(v: InterpreterResult) -> Result<f64, RuntimeError> {
 }
 
 impl StatementVisitor<InterpreterResult> for Interpreter {
+    fn visit_block(&mut self, stmts: &Vec<Stmt>) -> InterpreterResult {
+        // make new inner environment
+        let new_env = Environment::new_with_scope(&self.environment);
+        let tmp = std::mem::replace(&mut self.environment, new_env);
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+
+        // add back as we come out of recursive loops
+        self.environment = tmp;
+
+        Ok(Value::Null)
+    }
+
     fn visit_variable_def(&mut self, ident: &str, initializer: &Option<Expr>) -> InterpreterResult {
         if let Some(expr) = initializer {
             match self.evaluate(&expr) {
@@ -221,21 +234,21 @@ mod tests {
         assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at RightParen".to_string() }));
     }
 
-    // #[test]
-    // fn it_errors_not_number() {
-    //     let tokens = Scanner::new("*1".to_owned()).collect();
-    //     let stmts = Parser::new(tokens).parse();
-    //     let res = Interpreter.start(&stmts[0].as_ref().unwrap());
-    //     assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at Star".to_string() }));
-    //     let res = Interpreter.start(&stmts[1].as_ref().unwrap());
-    //     assert_eq!(res, Ok(Value::NUMBER(1.0)));
-    // }
+    #[test]
+    fn it_does_not_error_prefix_number() {
+        let tokens = Scanner::new("*1".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::NUMBER(1.0)));
+    }
 
     // #[test]
     // fn it_errors_invalid_operator() {
     //     let tokens = Scanner::new("1&1".to_owned()).collect();
-    //     let stmt = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
-    //     let res = Interpreter.start(&stmt.unwrap());
+    //     let stmts = Parser::new(tokens).parse();
+    //     let mut interp = Interpreter::new();
+    //     let res = interp.start(stmts);
     //     assert_eq!(res, Err(RuntimeError { line: 0, message: "Parsing error at &".to_string() }));
     // }
 
@@ -303,6 +316,72 @@ print(a);".to_owned()).collect();
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
-        assert_eq!(res, Err(RuntimeError { line: 0, message: "Variable b does not exist".to_string() }));
+        assert_eq!(res, Err(RuntimeError { line: 0, message: "Variable \"b\" does not exist".to_string() }));
+    }
+
+    #[test]
+    fn it_works_block() {
+        let tokens = Scanner::new("{
+var a = 4;
+print(a);
+}".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 0);
+        assert_eq!(interp.environment.variables.get("a"), None);
+    }
+
+    #[test]
+    fn it_works_shadow_block() {
+        let tokens = Scanner::new("
+var a = 4;
+{
+    var a = 4;
+    print(a);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(4.0)));
+        assert_eq!(interp.environment.enclosing, None);
+    }
+
+    #[test]
+    fn it_works_replace_inner_block() {
+        let tokens = Scanner::new("
+var a = 4;
+{
+    a = 5;
+    var b = 10.1;
+    print(a);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(4.0)));
+        assert_eq!(interp.environment.enclosing, None);
+    }
+
+    #[test]
+    fn it_block_errors() {
+        let tokens = Scanner::new("
+var a = 4;
+{
+    b = 5;
+    print(b);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Err(RuntimeError { line: 0, message: "Variable \"b\" does not exist".to_string() }));
     }
 }

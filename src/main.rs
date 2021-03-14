@@ -58,20 +58,7 @@ fn run(source: String) -> TWResult<()> {
     let stmts = parser.parse();
     let mut interp = Interpreter::new();
     let res = interp.start(stmts);
-    eprintln!("{}", res.unwrap());
-    // while let Some(stmt) = stmts.next() {
-    //     match stmt {
-    //         Some(stmt) => {
-    //             println!("{:?}", parser::debug_tree(&stmt));
-
-    //             let result = Interpreter.start(&stmt);
-
-    //             eprintln!("{:?}", result.unwrap());
-    //         },
-    //         None => eprintln!("{}", "Not a valid Lox statement")
-    //     }
-
-    // }
+    eprintln!("{:?}", res);
 
     Ok(())
 }
