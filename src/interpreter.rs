@@ -87,6 +87,22 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
         }
     }
 
+    fn visit_logical(&mut self, l: &Expr, op: &LexemeKind, r: &Expr) -> InterpreterResult {
+        let left_result = self.evaluate(l);
+
+        if op == &LexemeKind::OR {
+            if is_truthy(&left_result) {
+                return left_result;
+            }
+        } else {
+            if !is_truthy(&left_result) {
+                return left_result;
+            }
+        }
+
+        self.evaluate(r)
+    }
+
     fn visit_literal(&mut self, val: &Value) -> InterpreterResult {
         Ok(val.clone())
     }
@@ -131,6 +147,14 @@ fn unwrap_number(v: InterpreterResult) -> Result<f64, RuntimeError> {
             line: 0,
             message: "Not a number".to_string(),
         })
+    }
+}
+
+fn is_truthy(expr: &Result<Value, RuntimeError>) -> bool {
+    match expr {
+        Ok(Value::Null) => false,
+        Ok(Value::BOOLEAN(false)) => false,
+        _ => true,
     }
 }
 
@@ -415,6 +439,72 @@ if (true)
         assert_eq!(res, Ok(Value::Null));
         assert_eq!(interp.environment.variables.len(), 1);
         assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.enclosing, None);
+    }
+
+    #[test]
+    fn it_and_operator_works() {
+        let tokens = Scanner::new("
+var a = true and 5;
+if (a)
+{
+    print(a);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.enclosing, None);
+    }
+
+    #[test]
+    fn it_or_operator_works() {
+        let tokens = Scanner::new("
+var a = \"hi\" or 5;
+if (a)
+{
+    print(a);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::STRING("hi".to_string())));
+        assert_eq!(interp.environment.enclosing, None);
+    }
+
+    #[test]
+    fn it_or_falsey_operator_works() {
+        let tokens = Scanner::new("
+var a = false or 5;
+print(a);
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.enclosing, None);
+    }
+
+    #[test]
+    fn it_and_falsey_operator_works() {
+        let tokens = Scanner::new("
+var a = false and false;
+print(a);
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::BOOLEAN(false)));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::BOOLEAN(false)));
         assert_eq!(interp.environment.enclosing, None);
     }
 }

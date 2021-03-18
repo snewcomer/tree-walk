@@ -9,6 +9,7 @@ use crate::parser::{Expr, Stmt, Value};
 pub trait ExpressionVisitor<T> {
     fn visit_assign(&mut self, name: &str, expr: &Expr) -> T;
     fn visit_binary(&mut self, left: &Expr, operator: &LexemeKind, right: &Expr) -> T;
+    fn visit_logical(&mut self, left: &Expr, operator: &LexemeKind, right: &Expr) -> T;
     fn visit_literal(&mut self, val: &Value) -> T;
     fn visit_unary(&mut self, operator: &LexemeKind, right: &Expr) -> T;
     fn visit_grouping(&mut self, val: &Expr) -> T;
