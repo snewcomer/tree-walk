@@ -149,6 +149,20 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
         Ok(Value::Null)
     }
 
+    fn visit_if(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: &Option<Stmt>) -> InterpreterResult {
+        match self.evaluate(condition) {
+            Ok(Value::BOOLEAN(true)) => self.execute(then_branch),
+            Ok(Value::BOOLEAN(false)) => {
+                if let Some(e) = else_branch {
+                    self.execute(e)
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            _ => Ok(Value::Null)
+        }
+    }
+
     fn visit_variable_def(&mut self, ident: &str, initializer: &Option<Expr>) -> InterpreterResult {
         if let Some(expr) = initializer {
             match self.evaluate(&expr) {
@@ -383,5 +397,24 @@ var a = 4;
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Err(RuntimeError { line: 0, message: "Variable \"b\" does not exist".to_string() }));
+    }
+
+    #[test]
+    fn it_if_stmt_works() {
+        let tokens = Scanner::new("
+var a = 5;
+if (true)
+{
+    var b = 10.1;
+    print(a);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 1);
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.enclosing, None);
     }
 }
