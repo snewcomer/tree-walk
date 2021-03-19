@@ -32,15 +32,12 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {
+        Self {
             environment: Environment::new()
         }
     }
 
-
     pub fn start(&mut self, stmts: Vec<Stmt>) -> InterpreterResult {
-        // let mut variables = HashMap::new();
-
         let mut result = Ok(Value::Null);
         let mut iter_stmts = stmts.into_iter();
 
@@ -162,14 +159,18 @@ fn is_truthy(expr: &Result<Value, RuntimeError>) -> bool {
 impl StatementVisitor<InterpreterResult> for Interpreter {
     fn visit_block(&mut self, stmts: &Vec<Stmt>) -> InterpreterResult {
         // make new inner environment
-        let new_env = Environment::new_with_scope(&self.environment);
-        let _ = std::mem::replace(&mut self.environment, new_env);
+        // unable to have mutable copy as we descend down the tree :(
+        let new_env = Environment::new_with_scope(self.environment.clone());
+        let mut tmp = std::mem::replace(&mut self.environment, new_env);
+
         for stmt in stmts {
+            // stmt.accept(&mut interp_new)?;
             self.execute(stmt)?;
         }
 
         // add back as we come out of recursive loops
-        // self.environment = tmp;
+        tmp.merge(&self.environment);
+        let _ = std::mem::replace(&mut self.environment, tmp);
 
         Ok(Value::Null)
     }
@@ -367,7 +368,7 @@ print(a);".to_owned()).collect();
     }
 
     #[test]
-    fn it_works_block() {
+    fn it_works_block_ss() {
         let tokens = Scanner::new("{
 var a = 4;
 print(a);
@@ -378,6 +379,7 @@ print(a);
         assert_eq!(res, Ok(Value::Null));
         assert_eq!(interp.environment.variables.len(), 0);
         assert_eq!(interp.environment.variables.get("a"), None);
+        assert_eq!(interp.environment.enclosing, None);
     }
 
     #[test]
@@ -517,10 +519,6 @@ print(a);
         assert_eq!(interp.environment.enclosing, None);
     }
 
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use std::collections::HashMap;
-
     #[test]
     fn it_while_works() {
         let tokens = Scanner::new("
@@ -538,14 +536,6 @@ while (b) {
         assert_eq!(interp.environment.variables.len(), 2);
         assert_eq!(interp.environment.variables.get("b"), Some(&Value::BOOLEAN(false)));
         assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(2.0)));
-        let mut hmap = HashMap::new();
-        hmap.insert("a".to_string(), Value::NUMBER(1.0));
-        hmap.insert("b".to_string(), Value::BOOLEAN(true));
-        assert_eq!(interp.environment.enclosing, Some(Rc::new(RefCell::new(
-            Environment {
-                variables: hmap,
-                enclosing: None
-            }
-        ))));
+        assert_eq!(interp.environment.enclosing, None);
     }
 }
