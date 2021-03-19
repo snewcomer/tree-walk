@@ -1,6 +1,8 @@
 mod environment;
 
 use std::fmt;
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::parser::{Expr, Stmt, Value};
 use crate::lexer::LexemeKind;
 use crate::parser;
@@ -27,13 +29,13 @@ impl fmt::Display for RuntimeError {
 type InterpreterResult = Result<Value, RuntimeError>;
 
 pub struct Interpreter {
-    environment: Environment,
+    environment: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            environment: Environment::new()
+            environment: Rc::new(RefCell::new(Environment::new()))
         }
     }
 
@@ -64,7 +66,7 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
     fn visit_assign(&mut self, name: &str, expr: &Expr) -> InterpreterResult {
         let val = self.evaluate(&expr)?;
 
-        self.environment.assign(name.to_string(), val.clone())?;
+        self.environment.borrow_mut().assign(name.to_string(), val.clone())?;
 
         Ok(val)
     }
@@ -124,7 +126,7 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
     }
 
     fn visit_variable(&mut self, ident: &str) -> InterpreterResult {
-        match self.environment.retrieve(ident) {
+        match self.environment.borrow().retrieve(ident) {
             Ok(val) => Ok(val.clone()),
             m => m
         }
@@ -160,17 +162,15 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
     fn visit_block(&mut self, stmts: &Vec<Stmt>) -> InterpreterResult {
         // make new inner environment
         // unable to have mutable copy as we descend down the tree :(
-        let new_env = Environment::new_with_scope(self.environment.clone());
-        let mut tmp = std::mem::replace(&mut self.environment, new_env);
+        let new_env = Environment::new_with_scope(&self.environment);
+
+        let tmp = std::mem::replace(&mut self.environment, Rc::new(RefCell::new(new_env)));
 
         for stmt in stmts {
-            // stmt.accept(&mut interp_new)?;
             self.execute(stmt)?;
         }
 
-        // add back as we come out of recursive loops
-        tmp.merge(&self.environment);
-        let _ = std::mem::replace(&mut self.environment, tmp);
+        self.environment = tmp;
 
         Ok(Value::Null)
     }
@@ -201,7 +201,7 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
         if let Some(expr) = initializer {
             match self.evaluate(&expr) {
                 Ok(val) => {
-                    self.environment.define(ident.to_string(), val);
+                    self.environment.borrow_mut().define(ident.to_string(), val);
                     Ok(Value::Null)
                 }
                 err => {
@@ -334,16 +334,16 @@ mod tests {
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 0);
-        assert_eq!(interp.environment.variables.get("a"), None);
+        assert_eq!(interp.environment.borrow().variables.len(), 0);
+        assert_eq!(interp.environment.borrow().variables.get("a"), None);
 
         let tokens = Scanner::new("var a = \"foo\";".to_owned()).collect();
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::STRING("foo".to_string())));
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::STRING("foo".to_string())));
     }
 
     #[test]
@@ -354,8 +354,8 @@ print(a);".to_owned()).collect();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(4.0)));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(4.0)));
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(4.0)));
     }
 
     #[test]
@@ -377,9 +377,9 @@ print(a);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 0);
-        assert_eq!(interp.environment.variables.get("a"), None);
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 0);
+        assert_eq!(interp.environment.borrow().variables.get("a"), None);
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -395,9 +395,9 @@ var a = 4;
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(4.0)));
-        // assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(4.0)));
+        // assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -414,9 +414,9 @@ var a = 4;
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -448,9 +448,9 @@ if (true)
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -466,9 +466,9 @@ if (a)
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -484,9 +484,9 @@ if (a)
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::STRING("hi".to_string())));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::STRING("hi".to_string())));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -499,9 +499,9 @@ print(a);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -514,9 +514,9 @@ print(a);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::BOOLEAN(false)));
-        assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::BOOLEAN(false)));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::BOOLEAN(false)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 
     #[test]
@@ -533,9 +533,9 @@ while (b) {
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.variables.len(), 2);
-        assert_eq!(interp.environment.variables.get("b"), Some(&Value::BOOLEAN(false)));
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(2.0)));
-        assert_eq!(interp.environment.enclosing, None);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
+        assert_eq!(interp.environment.borrow().variables.get("b"), Some(&Value::BOOLEAN(false)));
+        assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(2.0)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
     }
 }
