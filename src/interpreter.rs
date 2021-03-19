@@ -37,6 +37,7 @@ impl Interpreter {
         }
     }
 
+
     pub fn start(&mut self, stmts: Vec<Stmt>) -> InterpreterResult {
         // let mut variables = HashMap::new();
 
@@ -162,13 +163,13 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
     fn visit_block(&mut self, stmts: &Vec<Stmt>) -> InterpreterResult {
         // make new inner environment
         let new_env = Environment::new_with_scope(&self.environment);
-        let tmp = std::mem::replace(&mut self.environment, new_env);
+        let _ = std::mem::replace(&mut self.environment, new_env);
         for stmt in stmts {
             self.execute(stmt)?;
         }
 
         // add back as we come out of recursive loops
-        self.environment = tmp;
+        // self.environment = tmp;
 
         Ok(Value::Null)
     }
@@ -185,6 +186,14 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
             }
             _ => Ok(Value::Null)
         }
+    }
+
+    fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> InterpreterResult {
+        while is_truthy(&self.evaluate(condition)) {
+            let _ = self.execute(body);
+        }
+
+        Ok(Value::Null)
     }
 
     fn visit_variable_def(&mut self, ident: &str, initializer: &Option<Expr>) -> InterpreterResult {
@@ -386,7 +395,7 @@ var a = 4;
         assert_eq!(res, Ok(Value::Null));
         assert_eq!(interp.environment.variables.len(), 1);
         assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(4.0)));
-        assert_eq!(interp.environment.enclosing, None);
+        // assert_eq!(interp.environment.enclosing, None);
     }
 
     #[test]
@@ -404,7 +413,7 @@ var a = 4;
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
         assert_eq!(interp.environment.variables.len(), 1);
-        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(4.0)));
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.enclosing, None);
     }
 
@@ -506,5 +515,37 @@ print(a);
         assert_eq!(interp.environment.variables.len(), 1);
         assert_eq!(interp.environment.variables.get("a"), Some(&Value::BOOLEAN(false)));
         assert_eq!(interp.environment.enclosing, None);
+    }
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::collections::HashMap;
+
+    #[test]
+    fn it_while_works() {
+        let tokens = Scanner::new("
+var a = 1;
+var b = true;
+while (b) {
+    b = false;
+    a = 2;
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.variables.len(), 2);
+        assert_eq!(interp.environment.variables.get("b"), Some(&Value::BOOLEAN(false)));
+        assert_eq!(interp.environment.variables.get("a"), Some(&Value::NUMBER(2.0)));
+        let mut hmap = HashMap::new();
+        hmap.insert("a".to_string(), Value::NUMBER(1.0));
+        hmap.insert("b".to_string(), Value::BOOLEAN(true));
+        assert_eq!(interp.environment.enclosing, Some(Rc::new(RefCell::new(
+            Environment {
+                variables: hmap,
+                enclosing: None
+            }
+        ))));
     }
 }

@@ -20,6 +20,7 @@ pub trait ExpressionVisitor<T> {
 pub trait StatementVisitor<T> {
     fn visit_block(&mut self, stmts: &Vec<Stmt>) -> T;
     fn visit_if(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: &Option<Stmt>) -> T;
+    fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> T;
     fn visit_variable_def(&mut self, ident: &str, expr: &Option<Expr>) -> T;
     fn visit_print(&mut self, expr: &Option<Expr>) -> T;
     fn visit_expr(&mut self, expr: &Expr) -> T;
