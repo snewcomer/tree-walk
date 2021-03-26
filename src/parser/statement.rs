@@ -1,6 +1,6 @@
 use crate::lexer::LexemeKind;
 use super::expression::Expr;
-use super::Parser;
+use super::{Parser, Value};
 use crate::visitor::StatementVisitor;
 
 #[derive(Debug, PartialEq)]
@@ -62,6 +62,9 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
         p.cursor += 1;
         // ultimately, this is what our program is made up of
         declaration_stmt(p)
+    } else if p.at(LexemeKind::FOR) {
+        p.cursor += 1;
+        for_statement(p)
     } else if p.at(LexemeKind::IF) {
         p.cursor += 1;
         if_statement(p)
@@ -97,6 +100,69 @@ fn if_statement(p: &mut Parser) -> Option<Stmt> {
     }
 
     Some(Stmt::If { condition, then_branch: Box::new(then_branch), else_branch: Box::new(else_branch) })
+}
+
+fn for_statement(p: &mut Parser) -> Option<Stmt> {
+    p.eat_whitespace();
+
+    let _ = p.expect(LexemeKind::LeftParen);
+
+    p.eat_whitespace();
+
+    // for (var a = 0; ....)
+    let initializer = match p.peek_kind() {
+        Some(LexemeKind::Semicolon) => {
+            p.cursor += 1;
+            None
+        }
+        Some(LexemeKind::VAR) => {
+            p.cursor += 1;
+            declaration_stmt(p)
+        }
+        _ => {
+            p.cursor += 1;
+            Some(Stmt::Expr(p.expression().unwrap()))
+        }
+    };
+
+    p.eat_whitespace();
+
+    // for (...; a < 5 ;....)
+    let mut condition = match p.peek_kind() {
+        Some(LexemeKind::Semicolon) => None,
+        _ => p.expression()
+    };
+
+    p.cursor += 1;
+    p.eat_whitespace();
+
+    let increment = match p.peek_kind() {
+        Some(LexemeKind::RightParen) => None,
+        _ => p.expression()
+    };
+
+    let _ = p.expect(LexemeKind::RightParen);
+
+    p.eat_whitespace();
+    p.cursor += 1;
+
+    let mut body = block(p);
+
+    if increment.is_some() {
+        body = Some(Stmt::Block(Box::new(vec![body.unwrap(), Stmt::Expr(increment.unwrap())])));
+    }
+
+    if condition.is_none() {
+        condition = Some(Expr::Literal(Value::BOOLEAN(true)));
+    }
+
+    body = Some(Stmt::While { condition: condition.unwrap(), body: Box::new(body.unwrap()) });
+
+    if initializer.is_some() {
+        body = Some(Stmt::Block(Box::new(vec![initializer.unwrap(), body.unwrap()])));
+    }
+
+    body
 }
 
 fn while_statement(p: &mut Parser) -> Option<Stmt> {
@@ -486,5 +552,41 @@ if (true) {
                 }
             )
         );
+    }
+
+    #[test]
+    fn it_works_for_stmt() {
+        let tokens = Scanner::new("
+        for (var a = 0; a < 5; a = a + 1) {
+            print(a);
+        }".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(
+                Stmt::Block(Box::new(vec![
+                    Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(0.0))) },
+                    Stmt::While {
+                        condition: Expr::Binary {
+                            left: Box::new(Expr::Variable("a".to_string())),
+                            operator: LexemeKind::Less,
+                            right: Box::new(Expr::Literal(Value::NUMBER(5.0)))
+                        },
+                        body: Box::new(Stmt::Block(Box::new(vec![
+                            Stmt::Block(Box::new(vec![Stmt::Print(Some(Expr::Variable("a".to_string())))])),
+                            Stmt::Expr(Expr::Assign {
+                                name: "a".to_string(),
+                                expr: Box::new(Expr::Binary {
+                                    left: Box::new(Expr::Variable("a".to_string())),
+                                    operator: LexemeKind::Plus,
+                                    right: Box::new(Expr::Literal(Value::NUMBER(1.0)))
+                                })
+                            }),
+                        ]))),
+                    }
+                ]))
+            )
+        )
     }
 }

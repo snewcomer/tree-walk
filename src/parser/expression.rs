@@ -1,5 +1,5 @@
 use std::fmt;
-use crate::lexer::{LexemeKind, Token};
+use crate::lexer::{LexemeKind};
 use crate::visitor::ExpressionVisitor;
 
 #[derive(Debug, PartialEq)]
