@@ -87,6 +87,17 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
         }
     }
 
+    fn visit_call(&mut self, callee: &Expr, arguments: &Vec<Expr>) -> InterpreterResult {
+        let call = self.evaluate(callee)?;
+
+        let mut args = vec![];
+        for arg in arguments {
+            args.push(self.evaluate(arg)?);
+        }
+
+        todo!();
+    }
+
     fn visit_logical(&mut self, l: &Expr, op: &LexemeKind, r: &Expr) -> InterpreterResult {
         let left_result = self.evaluate(l);
 
@@ -226,6 +237,10 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
             }
             _ => Ok(Value::Null)
         }
+    }
+
+    fn visit_func(&mut self, ident: &str, parameters: &Vec<Expr>, block: &Stmt) -> InterpreterResult {
+        todo!();
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> InterpreterResult {

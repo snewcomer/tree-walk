@@ -305,7 +305,7 @@ impl Parser {
         if res.is_some() {
             res
         } else {
-            let res = self.primary();
+            let res = self.call();
             let token = self.tokens.get(self.cursor);
             if let Some(Token { lexeme: LexemeKind::UNEXPECTED(l), line }) = token {
                 self.cursor += 1;
@@ -314,6 +314,47 @@ impl Parser {
                 res
             }
         }
+    }
+
+    fn call(&mut self) -> Option<Expr> {
+        let mut expr = self.primary();
+
+        self.eat_whitespace();
+
+        loop {
+            if let Some(LexemeKind::LeftParen) = self.peek_kind() {
+                // consume LeftParen
+                self.cursor += 1;
+                self.eat_whitespace();
+
+                expr = self.finish_call(expr);
+            } else {
+                break;
+            }
+        }
+
+        expr
+    }
+
+    fn finish_call(&mut self, callee: Option<Expr>) -> Option<Expr> {
+        let mut arguments = vec![];
+
+        while self.peek_kind() != Some(LexemeKind::RightParen) {
+            self.eat_whitespace();
+            let _ = self.expect(LexemeKind::Comma);
+            // consume comma
+            self.cursor += 1;
+            self.eat_whitespace();
+
+            arguments.push(self.expression().unwrap());
+
+            self.eat_whitespace();
+        }
+
+        // TODO: fix this so can use `?`
+        let _ = self.expect(LexemeKind::RightParen);
+
+        Some(Expr::Call { callee: Box::new(callee.unwrap()), arguments: arguments })
     }
 
     fn primary(&mut self) -> Option<Expr> {

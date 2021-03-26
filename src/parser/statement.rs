@@ -15,6 +15,11 @@ pub enum Stmt {
         condition: Expr,
         body: Box<Stmt>,
     },
+    Func {
+        ident: String,
+        parameters: Vec<Expr>,
+        block: Box<Stmt>,
+    },
     VariableDef {
         ident: String,
         expr: Option<Expr>,
@@ -38,6 +43,9 @@ impl Stmt {
             }
             Stmt::While { condition, body } => {
                 visitor.visit_while(condition, body)
+            }
+            Stmt::Func { ident, parameters, block } => {
+                visitor.visit_func(ident, parameters, block)
             }
             Stmt::VariableDef { ident, expr } => {
                 visitor.visit_variable_def(ident, expr)
@@ -65,6 +73,9 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
     } else if p.at(LexemeKind::FOR) {
         p.cursor += 1;
         for_statement(p)
+    } else if p.at(LexemeKind::FUN) {
+        p.cursor += 1;
+        func_declaration(p)
     } else if p.at(LexemeKind::IF) {
         p.cursor += 1;
         if_statement(p)
@@ -78,6 +89,44 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
     } else {
         statement(p)
     }
+}
+
+fn func_declaration(p: &mut Parser) -> Option<Stmt> {
+    p.eat_whitespace();
+
+    let mut ident = "unknown".to_string();
+    if let Some(LexemeKind::IDENTIFIER(name)) = p.peek_kind() {
+        ident = name;
+    }
+
+    // consume identifier
+    p.cursor += 1;
+    p.eat_whitespace();
+
+    let _ = p.expect(LexemeKind::LeftParen);
+
+    let mut parameters = vec![];
+    while p.peek_kind() != Some(LexemeKind::RightParen) {
+        p.eat_whitespace();
+
+        let _ = p.expect(LexemeKind::Comma);
+
+        // consume comma
+        p.cursor += 1;
+        p.eat_whitespace();
+
+        parameters.push(p.expression().unwrap());
+
+        p.eat_whitespace();
+    }
+
+    let _ = p.expect(LexemeKind::RightParen);
+
+    let _ = p.expect(LexemeKind::LeftParen);
+
+    let block = block(p).unwrap();
+
+    Some(Stmt::Func { ident, parameters, block: Box::new(block) })
 }
 
 fn if_statement(p: &mut Parser) -> Option<Stmt> {

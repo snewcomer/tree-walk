@@ -13,6 +13,10 @@ pub enum Expr {
         operator: LexemeKind,
         right: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        arguments: Vec<Expr>,
+    },
     Literal(Value),
     Logical {
         left: Box<Expr>,
@@ -67,6 +71,9 @@ impl Expr {
             Expr::Binary { operator, left, right } => {
                 visitor.visit_binary(left, operator, right)
             }
+            Expr::Call { callee, arguments } => {
+                visitor.visit_call(callee, arguments)
+            }
             Expr::Logical { operator, left, right } => {
                 visitor.visit_logical(left, operator, right)
             }
@@ -118,6 +125,23 @@ impl Expr {
 
                 let r = &right.debug();
                 st.push_str(r);
+
+                st
+            },
+            Expr::Call { callee, arguments } => {
+                let mut st = String::new();
+                st.push_str("(");
+
+                // let op = operator.to_string();
+                // st.push_str(&op);
+                // st.push_str(" ");
+
+                // let l = &left.debug();
+                // st.push_str(l);
+                // st.push_str(" ");
+
+                // let r = &right.debug();
+                // st.push_str(r);
 
                 st
             },
