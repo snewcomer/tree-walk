@@ -2,7 +2,7 @@ use std::fmt;
 use crate::lexer::{LexemeKind};
 use crate::visitor::ExpressionVisitor;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Assign {
         name: String,
@@ -18,6 +18,7 @@ pub enum Expr {
         arguments: Vec<Expr>,
     },
     Literal(Value),
+    // END,
     Logical {
         left: Box<Expr>,
         operator: LexemeKind,
@@ -42,6 +43,7 @@ pub enum Value {
     BOOLEAN(bool),
     STRING(String),
     NUMBER(f64),
+    // Callable(Callback),
     Null,
 }
 

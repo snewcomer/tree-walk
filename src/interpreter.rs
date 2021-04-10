@@ -88,6 +88,7 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
     }
 
     fn visit_call(&mut self, callee: &Expr, arguments: &Vec<Expr>) -> InterpreterResult {
+        // Primary - IDENTIFIER(String)
         let call = self.evaluate(callee)?;
 
         let mut args = vec![];
@@ -239,8 +240,10 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
         }
     }
 
-    fn visit_func(&mut self, ident: &str, parameters: &Vec<Expr>, block: &Stmt) -> InterpreterResult {
-        todo!();
+    fn visit_func(&mut self, ident: &str, _parameters: &Vec<Expr>, block: &Stmt) -> InterpreterResult {
+        // self.environment.borrow_mut().define_stmt(ident.to_string(), block.clone());
+
+        Ok(Value::Null)
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> InterpreterResult {

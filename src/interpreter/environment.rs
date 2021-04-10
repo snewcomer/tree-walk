@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections;
 use std::rc::Rc;
 use std::collections::HashMap;
-use crate::parser::Value;
+use crate::parser::{Stmt, Value};
 use super::RuntimeError;
 
 #[derive(Clone, Debug, PartialEq)]

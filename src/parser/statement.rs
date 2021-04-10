@@ -3,7 +3,7 @@ use super::expression::Expr;
 use super::{Parser, Value};
 use crate::visitor::StatementVisitor;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Block(Box<Vec<Stmt>>),
     If {
@@ -70,12 +70,12 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
         p.cursor += 1;
         // ultimately, this is what our program is made up of
         declaration_stmt(p)
-    } else if p.at(LexemeKind::FOR) {
-        p.cursor += 1;
-        for_statement(p)
     } else if p.at(LexemeKind::FUN) {
         p.cursor += 1;
         func_declaration(p)
+    } else if p.at(LexemeKind::FOR) {
+        p.cursor += 1;
+        for_statement(p)
     } else if p.at(LexemeKind::IF) {
         p.cursor += 1;
         if_statement(p)
@@ -86,6 +86,10 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
         p.cursor += 1;
 
         block(p)
+    } else if p.at(LexemeKind::Semicolon) {
+        p.cursor += 1;
+
+        None
     } else {
         statement(p)
     }
@@ -109,20 +113,22 @@ fn func_declaration(p: &mut Parser) -> Option<Stmt> {
     while p.peek_kind() != Some(LexemeKind::RightParen) {
         p.eat_whitespace();
 
-        let _ = p.expect(LexemeKind::Comma);
-
-        // consume comma
-        p.cursor += 1;
-        p.eat_whitespace();
-
         parameters.push(p.expression().unwrap());
+
+        if let Some(LexemeKind::Comma) = p.peek_kind() {
+            // consume comma
+            p.cursor += 1;
+            p.eat_whitespace();
+        }
 
         p.eat_whitespace();
     }
 
     let _ = p.expect(LexemeKind::RightParen);
 
-    let _ = p.expect(LexemeKind::LeftParen);
+    p.eat_whitespace();
+
+    let _ = p.expect(LexemeKind::LeftBrace);
 
     let block = block(p).unwrap();
 
@@ -193,8 +199,9 @@ fn for_statement(p: &mut Parser) -> Option<Stmt> {
     let _ = p.expect(LexemeKind::RightParen);
 
     p.eat_whitespace();
-    p.cursor += 1;
 
+    // eat LEFT_BRACE {
+    p.cursor += 1;
     let mut body = block(p);
 
     if increment.is_some() {
@@ -234,8 +241,9 @@ fn block(p: &mut Parser) -> Option<Stmt> {
     p.eat_whitespace();
 
     while p.at(LexemeKind::RightBrace) == false {
-        let res = parse(p);
-        v.push(res.unwrap());
+        if let Some(res) = parse(p) {
+            v.push(res);
+        }
 
         p.eat_whitespace();
     }
@@ -489,6 +497,25 @@ print(a);".to_owned()).collect();
     }
 
     #[test]
+    fn simple_block() {
+        let tokens = Scanner::new("{ 1; }".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(
+                Stmt::Block(
+                    Box::new(
+                        vec![
+                            Stmt::Expr(Expr::Literal(Value::NUMBER(1.0))),
+                        ]
+                    )
+                )
+            )
+        );
+    }
+
+    #[test]
     fn it_works_block_spaces() {
         let tokens = Scanner::new("{
             var a = 2;
@@ -637,5 +664,37 @@ if (true) {
                 ]))
             )
         )
+    }
+
+    #[test]
+    fn empty_func_works() {
+        let tokens = Scanner::new("fun foo(age) {}".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(Stmt::Func {
+                ident: "foo".to_string(),
+                parameters: vec![Expr::Variable("age".to_string())],
+                block: Box::new(Stmt::Block(Box::new(vec![])))
+            })
+        );
+    }
+
+    #[test]
+    fn func_works() {
+        let tokens = Scanner::new("fun foo(age) { print(1); }".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(Stmt::Func {
+                ident: "foo".to_string(),
+                parameters: vec![Expr::Variable("age".to_string())],
+                block: Box::new(Stmt::Block(Box::new(vec![
+                    Stmt::Print(Some(Expr::Literal(Value::NUMBER(1.0))))
+                ])))
+            })
+        );
     }
 }
