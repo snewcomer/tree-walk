@@ -110,7 +110,7 @@ impl fmt::Display for LexemeKind {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     pub line: usize,
     pub lexeme: LexemeKind,

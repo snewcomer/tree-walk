@@ -3,8 +3,8 @@ mod environment;
 use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::parser::{Expr, Stmt, Value};
-use crate::lexer::LexemeKind;
+use crate::parser::{Expr, Stmt, Value, Callable};
+use crate::lexer::{LexemeKind, Token};
 use crate::parser;
 use crate::visitor::{ExpressionVisitor, StatementVisitor};
 pub use environment::Environment;
@@ -26,7 +26,7 @@ impl fmt::Display for RuntimeError {
     }
 }
 
-type InterpreterResult = Result<Value, RuntimeError>;
+pub type InterpreterResult = Result<Value, RuntimeError>;
 
 pub struct Interpreter {
     environment: Rc<RefCell<Environment>>,
@@ -240,8 +240,15 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
         }
     }
 
-    fn visit_func(&mut self, ident: &str, _parameters: &Vec<Expr>, block: &Stmt) -> InterpreterResult {
-        // self.environment.borrow_mut().define_stmt(ident.to_string(), block.clone());
+    fn visit_func_declaration(&mut self, ident: &str, parameters: &Vec<Token>, body: &Box<Stmt>) -> InterpreterResult {
+        self.environment.borrow_mut().define(
+            ident.to_string(),
+            Value::Callable(Callable::UserFunction {
+                name: ident.to_string(),
+                params: parameters.clone(),
+                body: body.clone(),
+            })
+        );
 
         Ok(Value::Null)
     }
@@ -554,6 +561,34 @@ while (b) {
         assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("b"), Some(&Value::BOOLEAN(false)));
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(2.0)));
+        assert_eq!(interp.environment.borrow().enclosing, None);
+    }
+
+    #[test]
+    fn func_interp_works() {
+        let tokens = Scanner::new("
+fun a() { print(1); }
+a();
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        // assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::Callable(Callable::UserFunction {
+        //     name: "a".to_string(),
+        //     params: vec![],
+        //     body: Box::new(
+        //         Stmt::Block(
+        //             Box::new(
+        //                 vec![
+        //                     Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(2.0))) },
+        //                     Stmt::Print(Some(Expr::Variable("a".to_string()))),
+        //                 ]
+        //             )
+        //         )
+        //     )
+        // })));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
 }

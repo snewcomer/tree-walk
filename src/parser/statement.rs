@@ -1,4 +1,4 @@
-use crate::lexer::LexemeKind;
+use crate::lexer::{LexemeKind, Token};
 use super::expression::Expr;
 use super::{Parser, Value};
 use crate::visitor::StatementVisitor;
@@ -17,8 +17,8 @@ pub enum Stmt {
     },
     Func {
         ident: String,
-        parameters: Vec<Expr>,
-        block: Box<Stmt>,
+        parameters: Vec<Token>,
+        body: Box<Stmt>,
     },
     VariableDef {
         ident: String,
@@ -44,8 +44,8 @@ impl Stmt {
             Stmt::While { condition, body } => {
                 visitor.visit_while(condition, body)
             }
-            Stmt::Func { ident, parameters, block } => {
-                visitor.visit_func(ident, parameters, block)
+            Stmt::Func { ident, parameters, body } => {
+                visitor.visit_func_declaration(ident, parameters, body)
             }
             Stmt::VariableDef { ident, expr } => {
                 visitor.visit_variable_def(ident, expr)
@@ -113,7 +113,13 @@ fn func_declaration(p: &mut Parser) -> Option<Stmt> {
     while p.peek_kind() != Some(LexemeKind::RightParen) {
         p.eat_whitespace();
 
-        parameters.push(p.expression().unwrap());
+        if let Some(LexemeKind::IDENTIFIER(_)) = p.peek_kind() {
+            // we should clone this
+            parameters.push(p.peek().unwrap().clone());
+
+            p.cursor += 1;
+            p.eat_whitespace();
+        }
 
         if let Some(LexemeKind::Comma) = p.peek_kind() {
             // consume comma
@@ -132,7 +138,7 @@ fn func_declaration(p: &mut Parser) -> Option<Stmt> {
 
     let block = block(p).unwrap();
 
-    Some(Stmt::Func { ident, parameters, block: Box::new(block) })
+    Some(Stmt::Func { ident, parameters, body: Box::new(block) })
 }
 
 fn if_statement(p: &mut Parser) -> Option<Stmt> {
@@ -318,7 +324,7 @@ fn print_stmt(p: &mut Parser) -> Option<Stmt> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::Scanner;
+    use crate::lexer::{Scanner, Token};
     use crate::parser::{Parser, Value};
 
     #[test]
@@ -675,8 +681,8 @@ if (true) {
             res,
             Some(Stmt::Func {
                 ident: "foo".to_string(),
-                parameters: vec![Expr::Variable("age".to_string())],
-                block: Box::new(Stmt::Block(Box::new(vec![])))
+                parameters: vec![Token { line: 0, lexeme: LexemeKind::IDENTIFIER("age".to_string()) }],
+                body: Box::new(Stmt::Block(Box::new(vec![])))
             })
         );
     }
@@ -690,8 +696,8 @@ if (true) {
             res,
             Some(Stmt::Func {
                 ident: "foo".to_string(),
-                parameters: vec![Expr::Variable("age".to_string())],
-                block: Box::new(Stmt::Block(Box::new(vec![
+                parameters: vec![Token { line: 0, lexeme: LexemeKind::IDENTIFIER("age".to_string()) }],
+                body: Box::new(Stmt::Block(Box::new(vec![
                     Stmt::Print(Some(Expr::Literal(Value::NUMBER(1.0))))
                 ])))
             })

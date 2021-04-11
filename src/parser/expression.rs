@@ -1,6 +1,7 @@
 use std::fmt;
 use crate::lexer::{LexemeKind};
 use crate::visitor::ExpressionVisitor;
+use super::callable::Callable;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
@@ -18,7 +19,6 @@ pub enum Expr {
         arguments: Vec<Expr>,
     },
     Literal(Value),
-    // END,
     Logical {
         left: Box<Expr>,
         operator: LexemeKind,
@@ -43,7 +43,7 @@ pub enum Value {
     BOOLEAN(bool),
     STRING(String),
     NUMBER(f64),
-    // Callable(Callback),
+    Callable(Callable),
     Null,
 }
 
@@ -52,6 +52,7 @@ impl Value {
         match self {
             Self::BOOLEAN(b) => b.to_string(),
             Self::NUMBER(n) => n.to_string(),
+            Self::Callable(callable) => callable.to_string(),
             Self::STRING(ref s) => format!("\"{}\"", s),
             Self::Null => "nil".to_owned(),
         }
@@ -170,6 +171,7 @@ impl Expr {
                     Value::BOOLEAN(false) => "true".to_string(),
                     Value::STRING(st) => st.to_string(),
                     Value::NUMBER(n) => n.to_string(),
+                    Value::Callable(callable) => todo!(),
                     Value::Null => "".to_string(),
                 }
             }

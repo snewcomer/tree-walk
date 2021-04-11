@@ -1,9 +1,11 @@
 pub(crate) mod expression;
 pub(crate) mod statement;
+pub(crate) mod callable;
 
 use crate::lexer::{LexemeKind, Token};
 pub use expression::{Expr, Value};
 pub use statement::Stmt;
+pub use callable::Callable;
 
 #[derive(Debug)]
 pub(crate) struct Parser {
@@ -340,15 +342,18 @@ impl Parser {
         let mut arguments = vec![];
 
         while self.peek_kind() != Some(LexemeKind::RightParen) {
-            self.eat_whitespace();
-            let _ = self.expect(LexemeKind::Comma);
-            // consume comma
-            self.cursor += 1;
+            // TODO: check arguments length. Not greater than 255
+
             self.eat_whitespace();
 
             arguments.push(self.expression().unwrap());
 
             self.eat_whitespace();
+
+            if let Some(LexemeKind::Comma) = self.peek_kind() {
+                // consume comma
+                self.cursor += 1;
+            }
         }
 
         // TODO: fix this so can use `?`
@@ -608,6 +613,32 @@ mod test {
                     operator: LexemeKind::AND,
                     right: Box::new(Expr::Literal(Value::NUMBER(5.0))),
                 })
+            })
+        );
+    }
+
+    #[test]
+    fn func_call() {
+        let tokens = Scanner::new("a()".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        assert_eq!(
+            ast,
+            Stmt::Expr(Expr::Call {
+                callee: Box::new(Expr::Variable("a".to_string())),
+                arguments: vec![],
+            })
+        );
+    }
+
+    #[test]
+    fn func_call_with_args() {
+        let tokens = Scanner::new("a(b, c,  d )".to_owned()).collect();
+        let ast = Parser::new(tokens).parse().into_iter().nth(0).unwrap();
+        assert_eq!(
+            ast,
+            Stmt::Expr(Expr::Call {
+                callee: Box::new(Expr::Variable("a".to_string())),
+                arguments: vec![Expr::Variable("b".to_string()), Expr::Variable("c".to_string()), Expr::Variable("d".to_string())],
             })
         );
     }
