@@ -39,6 +39,12 @@ impl Interpreter {
         }
     }
 
+    pub fn new_with_scope(env: Environment) -> Self {
+        Self {
+            environment: Rc::new(RefCell::new(env.clone()))
+        }
+    }
+
     pub fn start(&mut self, stmts: Vec<Stmt>) -> InterpreterResult {
         let mut result = Ok(Value::Null);
         let mut iter_stmts = stmts.into_iter();
@@ -88,15 +94,18 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
     }
 
     fn visit_call(&mut self, callee: &Expr, arguments: &Vec<Expr>) -> InterpreterResult {
-        // Primary - IDENTIFIER(String)
-        let call = self.evaluate(callee)?;
+        let callee_result = self.evaluate(callee)?;
 
         let mut args = vec![];
         for arg in arguments {
             args.push(self.evaluate(arg)?);
         }
 
-        todo!();
+        if let Value::Callable(c) = callee_result {
+            c.call(self, args)
+        } else {
+            todo!();
+        }
     }
 
     fn visit_logical(&mut self, l: &Expr, op: &LexemeKind, r: &Expr) -> InterpreterResult {
@@ -178,13 +187,18 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
 
         let tmp = std::mem::replace(&mut self.environment, Rc::new(RefCell::new(new_env)));
 
+        let mut res = None;
         for stmt in stmts {
-            self.execute(stmt)?;
+            res = Some(self.execute(stmt)?);
         }
 
         self.environment = tmp;
 
-        Ok(Value::Null)
+        if let Some(val) = res {
+            Ok(val)
+        } else {
+            Ok(Value::Null)
+        }
     }
 
     fn visit_if(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: &Option<Stmt>) -> InterpreterResult {
@@ -247,6 +261,7 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
                 name: ident.to_string(),
                 params: parameters.clone(),
                 body: body.clone(),
+                closure: Environment::new_with_scope(&self.environment), // we capture this b/c functions can be defined inside functions and returned as a value
             })
         );
 
@@ -401,7 +416,7 @@ print(a);
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
-        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(res, Ok(Value::NUMBER(4.0)));
         assert_eq!(interp.environment.borrow().variables.len(), 0);
         assert_eq!(interp.environment.borrow().variables.get("a"), None);
         assert_eq!(interp.environment.borrow().enclosing, None);
@@ -419,7 +434,7 @@ var a = 4;
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
-        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(res, Ok(Value::NUMBER(4.0)));
         assert_eq!(interp.environment.borrow().variables.len(), 1);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(4.0)));
         // assert_eq!(interp.environment.borrow().enclosing, None);
@@ -432,13 +447,13 @@ var a = 4;
 {
     a = 5;
     var b = 10.1;
-    print(a);
+    a;
 }
 ".to_owned()).collect();
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
-        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(res, Ok(Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().variables.len(), 1);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
@@ -472,7 +487,7 @@ if (true)
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
-        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(res, Ok(Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().variables.len(), 1);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
@@ -573,22 +588,21 @@ a();
         let stmts = Parser::new(tokens).parse();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
-        assert_eq!(res, Ok(Value::Null));
+        assert_eq!(res, Ok(Value::NUMBER(1.0)));
         assert_eq!(interp.environment.borrow().variables.len(), 1);
-        // assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::Callable(Callable::UserFunction {
-        //     name: "a".to_string(),
-        //     params: vec![],
-        //     body: Box::new(
-        //         Stmt::Block(
-        //             Box::new(
-        //                 vec![
-        //                     Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(2.0))) },
-        //                     Stmt::Print(Some(Expr::Variable("a".to_string()))),
-        //                 ]
-        //             )
-        //         )
-        //     )
-        // })));
-        assert_eq!(interp.environment.borrow().enclosing, None);
+    }
+
+    #[test]
+    fn func_interp_with_args_works() {
+        let tokens = Scanner::new("
+fun a(b) { b; }
+var b = 1;
+a(b);
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::NUMBER(1.0)));
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
     }
 }

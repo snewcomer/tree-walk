@@ -358,6 +358,10 @@ impl Parser {
 
         // TODO: fix this so can use `?`
         let _ = self.expect(LexemeKind::RightParen);
+        if let Some(LexemeKind::Semicolon) = self.peek_kind() {
+            // consume semicolon
+            self.cursor += 1;
+        }
 
         Some(Expr::Call { callee: Box::new(callee.unwrap()), arguments: arguments })
     }
