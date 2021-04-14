@@ -278,6 +278,14 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
             message: message.to_string(),
         })
     }
+
+    fn visit_return(&mut self, expression: &Option<Expr>) -> InterpreterResult {
+        if let Some(expr) = expression {
+            self.evaluate(expr)
+        } else {
+            Ok(Value::Null)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -374,7 +382,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.borrow().variables.len(), 0);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
         assert_eq!(interp.environment.borrow().variables.get("a"), None);
 
         let tokens = Scanner::new("var a = \"foo\";".to_owned()).collect();
@@ -382,7 +390,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::STRING("foo".to_string())));
     }
 
@@ -394,7 +402,7 @@ print(a);".to_owned()).collect();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(4.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(4.0)));
     }
 
@@ -417,7 +425,7 @@ print(a);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(4.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 0);
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
         assert_eq!(interp.environment.borrow().variables.get("a"), None);
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -435,7 +443,7 @@ var a = 4;
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(4.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(4.0)));
         // assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -454,7 +462,7 @@ var a = 4;
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -488,7 +496,7 @@ if (true)
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -506,7 +514,7 @@ if (a)
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -524,7 +532,7 @@ if (a)
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::STRING("hi".to_string())));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -539,7 +547,7 @@ print(a);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(5.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(5.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -554,7 +562,7 @@ print(a);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::BOOLEAN(false)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::BOOLEAN(false)));
         assert_eq!(interp.environment.borrow().enclosing, None);
     }
@@ -573,7 +581,7 @@ while (b) {
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::Null));
-        assert_eq!(interp.environment.borrow().variables.len(), 2);
+        assert_eq!(interp.environment.borrow().variables.len(), 3);
         assert_eq!(interp.environment.borrow().variables.get("b"), Some(&Value::BOOLEAN(false)));
         assert_eq!(interp.environment.borrow().variables.get("a"), Some(&Value::NUMBER(2.0)));
         assert_eq!(interp.environment.borrow().enclosing, None);
@@ -589,7 +597,7 @@ a();
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(1.0)));
-        assert_eq!(interp.environment.borrow().variables.len(), 1);
+        assert_eq!(interp.environment.borrow().variables.len(), 2);
     }
 
     #[test]
@@ -603,6 +611,82 @@ a(b);
         let mut interp = Interpreter::new();
         let res = interp.start(stmts);
         assert_eq!(res, Ok(Value::NUMBER(1.0)));
+        assert_eq!(interp.environment.borrow().variables.len(), 3);
+    }
+
+    #[test]
+    fn func_block_with_args_works() {
+        let tokens = Scanner::new("
+var b = 1;
+{
+    fun a(b) { b; }
+    a(b);
+}
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::NUMBER(1.0)));
         assert_eq!(interp.environment.borrow().variables.len(), 2);
+    }
+
+    #[test]
+    fn func_nested_scope() {
+        let tokens = Scanner::new("
+fun makeCounter() {
+    var i = 0;
+
+    fun count() {
+        i = i + 1;
+    }
+
+    return count;
+}
+
+var counter = makeCounter();
+counter();
+return counter();
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::NUMBER(1.0)));
+    }
+
+    #[test]
+    fn func_global_scope() {
+        let tokens = Scanner::new("
+var i = 0;
+fun makeCounter() {
+
+    fun count() {
+        i = i + 1;
+    }
+
+    return count;
+}
+
+var counter = makeCounter();
+// increment by 1
+counter();
+// still 1
+return counter();
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::NUMBER(2.0)));
+    }
+
+    #[test]
+    fn built_in_functions() {
+        let tokens = Scanner::new("
+clock();
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert!(matches!(res.unwrap(), Value::NUMBER(_)));
+        assert_eq!(interp.environment.borrow().variables.len(), 1);
     }
 }

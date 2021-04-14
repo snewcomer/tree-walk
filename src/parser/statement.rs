@@ -265,6 +265,13 @@ pub(crate) fn statement(p: &mut Parser) -> Option<Stmt> {
     if p.at(LexemeKind::PRINT) {
         p.cursor += 1; // PRINT
         print_stmt(p)
+    } else if p.at(LexemeKind::RETURN) {
+        p.cursor += 1; // RETURN
+        if let Some(expr) = p.expression() {
+            Some(Stmt::Expr(expr))
+        } else {
+            None
+        }
     } else {
         // fallthrough to expression
         let expr = p.expression()?;

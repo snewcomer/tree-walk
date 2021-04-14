@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use std::collections;
 use std::rc::Rc;
 use std::collections::HashMap;
-use crate::parser::{Stmt, Value};
+use std::time::SystemTime;
+use crate::parser::{Callable, Value};
 use super::RuntimeError;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,8 +15,20 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
+        let mut m = HashMap::new();
+
+        // TODO: extract definining builtin functions
+        let clock = Value::Callable(Callable::BuiltIn {
+            arity: 0,
+            func: |_, _| {
+                Ok(Value::NUMBER(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("whoops").as_millis() as f64))
+            }
+        });
+
+        m.insert("clock".to_string(), clock);
+
         Self {
-            variables: HashMap::new(),
+            variables: m,
             enclosing: None,
         }
     }

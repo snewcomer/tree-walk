@@ -18,6 +18,8 @@ pub trait ExpressionVisitor<T> {
     fn visit_error(&mut self, line: &usize, message: &str) -> T;
 }
 
+// "a statement...will not return a value". It means that a statement is not processed by evaluating
+// it into a final value (as an expression is), but is rather processed by executing it
 pub trait StatementVisitor<T> {
     fn visit_block(&mut self, stmts: &Vec<Stmt>) -> T;
     fn visit_if(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: &Option<Stmt>) -> T;
@@ -27,4 +29,5 @@ pub trait StatementVisitor<T> {
     fn visit_print(&mut self, expr: &Option<Expr>) -> T;
     fn visit_expr(&mut self, expr: &Expr) -> T;
     fn visit_error(&mut self, line: &usize, message: &str) -> T;
+    fn visit_return(&mut self, expression: &Option<Expr>) -> T;
 }

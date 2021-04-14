@@ -53,7 +53,9 @@ impl Parser {
 
             self.eat_whitespace();
 
-            stmts.push(res.unwrap());
+            if res.is_some() {
+                stmts.push(res.unwrap());
+            }
         }
 
         stmts

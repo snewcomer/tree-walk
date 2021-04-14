@@ -13,7 +13,7 @@ pub enum Callable {
         name: String,
         params: Vec<Token>,
         body: Box<Stmt>,
-        closure: Environment,
+        closure: Environment, // inner most closure wins
     }
 }
 

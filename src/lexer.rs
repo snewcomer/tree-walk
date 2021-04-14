@@ -522,6 +522,25 @@ andd
     }
 
     #[test]
+    fn it_handles_return() {
+        let source = "var bar = \"a\"; return bar";
+        let mut sc = Scanner::new(source.to_owned());
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::VAR, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("bar".to_owned()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Equal, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::STRING("a".to_string()), 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Semicolon, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::RETURN, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::Whitespace, 0));
+        assert_eq!(sc.next().unwrap(), Token::new(LexemeKind::IDENTIFIER("bar".to_owned()), 0));
+        assert_eq!(sc.next(), None);
+    }
+
+    #[test]
     fn it_handles_keywords() {
         let source = "print(\"foo\")";
         let mut sc = Scanner::new(source.to_owned());
