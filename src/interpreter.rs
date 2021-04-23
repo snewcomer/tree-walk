@@ -108,6 +108,31 @@ impl ExpressionVisitor<InterpreterResult> for Interpreter {
         }
     }
 
+    fn visit_get(&mut self, name: &str, object: &Expr) -> InterpreterResult {
+        let res = self.evaluate(object)?;
+
+        if let Value::Class(c) = res {
+            let val = c.get(name);
+            Ok(val.unwrap().clone())
+        } else {
+            todo!();
+        }
+    }
+
+    fn visit_set(&mut self, name: &str, object: &Expr, value: &Expr) -> InterpreterResult {
+        let res = self.evaluate(object)?;
+
+        if let Value::Class(mut c) = res {
+            if let Ok(val) = self.evaluate(value) {
+                c.set(name, val.clone());
+            }
+
+            Ok(Value::Null)
+        } else {
+            todo!();
+        }
+    }
+
     fn visit_logical(&mut self, l: &Expr, op: &LexemeKind, r: &Expr) -> InterpreterResult {
         let left_result = self.evaluate(l);
 
@@ -268,6 +293,20 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
         Ok(Value::Null)
     }
 
+    fn visit_class_declaration(&mut self, ident: &str, methods: &Vec<Stmt>) -> InterpreterResult {
+        self.environment.borrow_mut().define(
+            ident.to_string(),
+            Value::Callable(Callable::Class {
+                name: ident.to_string(),
+                methods: methods.clone(),
+                closure: Environment::new_with_scope(&self.environment), // we capture this b/c functions can be defined inside functions and returned as a value
+            })
+        );
+
+        // TODO references to self inside class name (env.assign(name, klass))
+        Ok(Value::Null)
+    }
+
     fn visit_expr(&mut self, expr: &Expr) -> InterpreterResult {
         self.evaluate(expr)
     }
@@ -292,7 +331,8 @@ impl StatementVisitor<InterpreterResult> for Interpreter {
 mod tests {
     use super::*;
     use crate::lexer::Scanner;
-    use crate::parser::Parser;
+    use crate::parser::{ClassInstance, Parser};
+    use std::collections::HashMap;
 
     #[test]
     fn it_works() {
@@ -688,5 +728,38 @@ clock();
         let res = interp.start(stmts);
         assert!(matches!(res.unwrap(), Value::NUMBER(_)));
         assert_eq!(interp.environment.borrow().variables.len(), 1);
+    }
+
+    #[test]
+    fn class_instance_works() {
+        let tokens = Scanner::new("
+class Foo {
+    myName() {
+        print(1);
+    }
+}
+
+return Foo();
+".to_owned()).collect();
+        let stmts = Parser::new(tokens).parse();
+        let mut interp = Interpreter::new();
+        let res = interp.start(stmts);
+        assert_eq!(res, Ok(Value::Class(ClassInstance {
+            name: "Foo".to_string(),
+            fields: HashMap::new(),
+            methods: vec![
+                Stmt::Func {
+                    ident: "myName".to_string(),
+                    parameters: vec![],
+                    body: Box::new(
+                        Stmt::Block(
+                            Box::new(vec![
+                                Stmt::Print(Some(Expr::Literal(Value::NUMBER(1.0))))
+                            ])
+                        )
+                    )
+                }
+            ]
+        })));
     }
 }

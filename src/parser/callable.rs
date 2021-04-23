@@ -2,6 +2,34 @@ use super::super::interpreter::{Environment, Interpreter, InterpreterResult};
 use super::expression::Value;
 use super::statement::Stmt;
 use crate::lexer::{LexemeKind, Token};
+use std::collections::HashMap;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClassInstance {
+    pub name: String,
+    pub fields: HashMap<String, Value>,
+    pub methods: Vec<Stmt>
+}
+
+impl ClassInstance {
+    pub fn to_string(&self) -> String {
+        self.name.to_string()
+    }
+}
+
+impl ClassInstance {
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        if self.fields.contains_key(name) {
+            return self.fields.get(name);
+        }
+
+        None
+    }
+
+    pub fn set(&mut self, name: &str, value: Value) {
+        self.fields.insert(name.to_string(), value);
+    }
+}
 
 #[derive(Clone)]
 pub enum Callable {
@@ -14,6 +42,11 @@ pub enum Callable {
         params: Vec<Token>,
         body: Box<Stmt>,
         closure: Environment, // inner most closure wins
+    },
+    Class {
+        name: String,
+        methods: Vec<Stmt>,
+        closure: Environment, // inner most closure wins
     }
 }
 
@@ -22,6 +55,7 @@ impl Callable {
         match self {
             Self::BuiltIn { arity, .. } => *arity,
             Self::UserFunction { params, .. } => params.len(),
+            _ => 0,
         }
     }
 
@@ -44,6 +78,13 @@ impl Callable {
                 let mut block_interpreter = Interpreter::new_with_scope(declaration_env);
                 block_interpreter.execute(body)
             }
+            Self::Class { name, methods, .. } => {
+                Ok(Value::Class(ClassInstance {
+                    name: name.to_owned(),
+                    fields: HashMap::new(),
+                    methods: methods.clone()
+                }))
+            }
         }
     }
 
@@ -51,6 +92,7 @@ impl Callable {
         match self {
             Self::BuiltIn { .. } => "<native fn>".to_owned(),
             Self::UserFunction { name, .. } => format!("<fn {}>", name),
+            Self::Class { name, .. } => format!("<class {}>", name),
         }
     }
 }

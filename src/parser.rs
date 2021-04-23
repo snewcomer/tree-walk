@@ -6,6 +6,7 @@ use crate::lexer::{LexemeKind, Token};
 pub use expression::{Expr, Value};
 pub use statement::Stmt;
 pub use callable::Callable;
+pub use callable::ClassInstance;
 
 #[derive(Debug)]
 pub(crate) struct Parser {
@@ -137,6 +138,23 @@ impl Parser {
                         expr = Some(Expr::Assign {
                             name: st,
                             expr: Box::new(r),
+                        });
+
+                        let _ = self.expect(LexemeKind::Semicolon);
+                    }
+                    None => {
+                        let last_token = self.last_token().unwrap();
+                        expr = self.error(last_token.line, "Unfinished right hand assignment expression");
+                    }
+                }
+            } else if let Some(Expr::Get { name, object }) = expr {
+                let right = self.assignment();
+                match right {
+                    Some(r) => {
+                        expr = Some(Expr::Set {
+                            name,
+                            object,
+                            value: Box::new(r),
                         });
 
                         let _ = self.expect(LexemeKind::Semicolon);
@@ -332,6 +350,13 @@ impl Parser {
                 self.eat_whitespace();
 
                 expr = self.finish_call(expr);
+            } else if let Some(LexemeKind::Dot) = self.peek_kind() {
+                self.cursor += 1;
+                if let Some(LexemeKind::IDENTIFIER(name)) = self.peek_kind() {
+                    expr = Some(Expr::Get { name, object: Box::new(expr.unwrap()) })
+                }
+                // TODO: should parser error here?  I don't think so.  Don't eagerly present error
+                // to user
             } else {
                 break;
             }

@@ -1,7 +1,7 @@
 use std::fmt;
 use crate::lexer::{LexemeKind};
 use crate::visitor::ExpressionVisitor;
-use super::callable::Callable;
+use super::callable::{Callable, ClassInstance};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
@@ -17,6 +17,15 @@ pub enum Expr {
     Call {
         callee: Box<Expr>,
         arguments: Vec<Expr>,
+    },
+    Get {
+        name: String,
+        object: Box<Expr>,
+    },
+    Set {
+        name: String,
+        object: Box<Expr>,
+        value: Box<Expr>,
     },
     Literal(Value),
     Logical {
@@ -44,6 +53,7 @@ pub enum Value {
     STRING(String),
     NUMBER(f64),
     Callable(Callable),
+    Class(ClassInstance),
     Null,
 }
 
@@ -53,6 +63,7 @@ impl Value {
             Self::BOOLEAN(b) => b.to_string(),
             Self::NUMBER(n) => n.to_string(),
             Self::Callable(callable) => callable.to_string(),
+            Self::Class(instance) => instance.to_string(),
             Self::STRING(ref s) => format!("\"{}\"", s),
             Self::Null => "nil".to_owned(),
         }
@@ -76,6 +87,12 @@ impl Expr {
             }
             Expr::Call { callee, arguments } => {
                 visitor.visit_call(callee, arguments)
+            }
+            Expr::Get { name, object } => {
+                visitor.visit_get(name, object)
+            }
+            Expr::Set { name, object, value } => {
+                visitor.visit_set(name, object, value)
             }
             Expr::Logical { operator, left, right } => {
                 visitor.visit_logical(left, operator, right)
@@ -172,6 +189,7 @@ impl Expr {
                     Value::STRING(st) => st.to_string(),
                     Value::NUMBER(n) => n.to_string(),
                     Value::Callable(callable) => todo!(),
+                    Value::Class(instance) => todo!(),
                     Value::Null => "".to_string(),
                 }
             }
@@ -191,6 +209,12 @@ impl Expr {
             },
             Expr::Grouping(value) => {
                 value.debug()
+            },
+            Expr::Get { .. } => {
+                todo!();
+            },
+            Expr::Set { .. } => {
+                todo!();
             },
             Expr::Variable(st) => {
                 st.to_string()

@@ -20,6 +20,10 @@ pub enum Stmt {
         parameters: Vec<Token>,
         body: Box<Stmt>,
     },
+    Class {
+        ident: String,
+        methods: Vec<Stmt>,
+    },
     VariableDef {
         ident: String,
         expr: Option<Expr>,
@@ -47,6 +51,9 @@ impl Stmt {
             Stmt::Func { ident, parameters, body } => {
                 visitor.visit_func_declaration(ident, parameters, body)
             }
+            Stmt::Class { ident, methods } => {
+                visitor.visit_class_declaration(ident, methods)
+            }
             Stmt::VariableDef { ident, expr } => {
                 visitor.visit_variable_def(ident, expr)
             }
@@ -73,6 +80,9 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
     } else if p.at(LexemeKind::FUN) {
         p.cursor += 1;
         func_declaration(p)
+    } else if p.at(LexemeKind::CLASS) {
+        p.cursor += 1;
+        class_declaration(p)
     } else if p.at(LexemeKind::FOR) {
         p.cursor += 1;
         for_statement(p)
@@ -93,6 +103,36 @@ pub(crate) fn parse(p: &mut Parser) -> Option<Stmt> {
     } else {
         statement(p)
     }
+}
+
+fn class_declaration(p: &mut Parser) -> Option<Stmt> {
+    p.eat_whitespace();
+    let mut ident = "anonymous".to_string();
+    if let Some(LexemeKind::IDENTIFIER(name)) = p.peek_kind() {
+        ident = name;
+    }
+
+    // consume identifier
+    p.cursor += 1;
+    p.eat_whitespace();
+
+    let _ = p.expect(LexemeKind::LeftBrace);
+
+    let mut methods = vec![];
+    while p.peek_kind() != Some(LexemeKind::RightBrace) {
+        p.eat_whitespace();
+        methods.push(func_declaration(p).unwrap());
+        p.eat_whitespace();
+    }
+
+    let _ = p.expect(LexemeKind::RightBrace);
+
+    p.eat_whitespace();
+
+    Some(Stmt::Class {
+        ident,
+        methods,
+    })
 }
 
 fn func_declaration(p: &mut Parser) -> Option<Stmt> {
@@ -707,6 +747,43 @@ if (true) {
                 body: Box::new(Stmt::Block(Box::new(vec![
                     Stmt::Print(Some(Expr::Literal(Value::NUMBER(1.0))))
                 ])))
+            })
+        );
+    }
+
+    #[test]
+    fn class_works() {
+        let tokens = Scanner::new("class Foo {}".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(Stmt::Class {
+                ident: "Foo".to_string(),
+                methods: vec![],
+            })
+        );
+    }
+
+    #[test]
+    fn class_works_with_methods() {
+        let tokens = Scanner::new("class Foo  \n { \n myName() {  var a = 2; print(a);  } }".to_owned()).collect();
+        let mut p = Parser::new(tokens);
+        let res = parse(&mut p);
+        assert_eq!(
+            res,
+            Some(Stmt::Class {
+                ident: "Foo".to_string(),
+                methods: vec![
+                    Stmt::Func {
+                        ident: "myName".to_string(),
+                        parameters: vec![],
+                        body: Box::new(Stmt::Block(Box::new(vec![
+                            Stmt::VariableDef { ident: "a".to_string(), expr: Some(Expr::Literal(Value::NUMBER(2.0))) },
+                            Stmt::Print(Some(Expr::Variable("a".to_string())))
+                        ])))
+                    }
+                ],
             })
         );
     }
